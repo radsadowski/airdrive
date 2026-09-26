@@ -1,0 +1,25 @@
+# binaries & builds
+bin/
+dist/
+frontend/dist/
+
+# go
+*.test
+*.out
+
+# node
+node_modules/
+
+# wails dev artifacts
+.task
+build/CHANGELOG.md
+build/linux/appimage/build
+build/windows/nsis/MicrosoftEdgeWebview2Setup.exe
+
+# os
+.DS_Store
+
+# ide
+.idea/
+.vscode/
+*.swp

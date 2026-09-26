@@ -1,0 +1,173 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', monospace;
+
+  /* cockpit palette — near-black with blue undertone, amber instrumentation */
+  --color-base: #0b0c0f;
+  --color-panel: #121316;
+  --color-elevated: #17181d;
+  --color-raised: #1d1e24;
+  --color-overlay: #202128;
+  --color-hairline: rgba(255, 255, 255, 0.07);
+  --color-hairline-strong: rgba(255, 255, 255, 0.12);
+
+  --color-ink: #e9eaee;
+  --color-ink-mut: #9b9ea8;
+  --color-ink-faint: #63666f;
+
+  --color-amber: #f5a623;
+  --color-amber-hi: #ffb733;
+  --color-amber-dim: #4a3a14;
+  --color-on-amber: #1c1304;
+
+  --color-danger: #e5534b;
+  --color-danger-dim: #47231f;
+  --color-success: #5fb269;
+  --color-success-dim: #1d3323;
+
+  /* location identity dots */
+  --color-loc-local: #f2c14e;
+  --color-loc-gdrive: #57ab5a;
+  --color-loc-s3: #5ca7e4;
+
+  --radius-card: 10px;
+  --radius-ctl: 6px;
+
+  --animate-pop-in: pop-in 0.16s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+  --animate-rise: rise 0.24s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-slide-up: slide-up 0.26s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-shimmer: shimmer 1.6s linear infinite;
+  --animate-spin-slow: spin 2.2s linear infinite;
+}
+
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes rise {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slide-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to { background-position: 200% 0; }
+}
+
+/* ------------------------------------------------------------------ */
+/* Light theme — overrides every color token; all components flip for  */
+/* free because they reference tokens, never raw hex.                  */
+/* ------------------------------------------------------------------ */
+[data-theme="light"] {
+  --color-base:            #f4f4f6;
+  --color-panel:           #ffffff;
+  --color-elevated:        #f8f8fa;
+  --color-raised:          #efeff2;
+  --color-overlay:         #ffffff;
+  --color-hairline:        rgba(0, 0, 0, 0.08);
+  --color-hairline-strong: rgba(0, 0, 0, 0.14);
+
+  --color-ink:             #16171b;
+  --color-ink-mut:         #5a5c66;
+  --color-ink-faint:       #9a9ca6;
+
+  --color-amber:           #d4820a;
+  --color-amber-hi:        #e8920f;
+  --color-amber-dim:       #fef3dc;
+  --color-on-amber:        #ffffff;
+
+  --color-danger:          #c93b35;
+  --color-danger-dim:      #fde8e7;
+  --color-success:         #2d8a3e;
+  --color-success-dim:     #e3f5e6;
+
+  --color-loc-local:       #c8960a;
+  --color-loc-gdrive:      #2d8a3e;
+  --color-loc-s3:          #2272b8;
+}
+
+[data-theme="light"] * {
+  scrollbar-color: rgba(0, 0, 0, 0.18) transparent;
+}
+[data-theme="light"] *::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.16);
+}
+[data-theme="light"] *::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.28);
+}
+[data-theme="light"] ::selection {
+  background: rgba(212, 130, 10, 0.22);
+}
+[data-theme="light"] #root::before {
+  opacity: 0.012;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  @apply bg-base text-ink font-sans antialiased;
+  font-feature-settings: 'ss02' on;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* selectable content areas */
+.allow-select, .allow-select * {
+  user-select: text;
+}
+
+/* thin cockpit scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+}
+*::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.13);
+  border-radius: 99px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.22);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+/* subtle grain over the whole cockpit */
+#root::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.028;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.focus-ring {
+  @apply outline-none ring-1 ring-amber/70 ring-offset-2 ring-offset-base;
+}
+
+/* ghost input */
+input, textarea {
+  @apply outline-none;
+}
+
+::selection {
+  background: rgba(245, 166, 35, 0.28);
+}

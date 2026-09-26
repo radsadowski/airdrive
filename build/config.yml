@@ -1,0 +1,26 @@
+version: '3'
+
+dev_mode:
+  root_path: .
+  debounce: 1000
+  ignore:
+    dir:
+      - .git
+      - node_modules
+      - frontend
+      - bin
+    file:
+      - .DS_Store
+    watched_extension:
+      - "*.go"
+    git_ignore: true
+  executes:
+    - cmd: npm --prefix frontend install
+      type: once
+    - cmd: npm --prefix frontend run dev -- --port 9245 --strictPort --host 127.0.0.1
+      type: background
+    - cmd: go build -buildvcs=false -gcflags="all=-l" -o bin/airdrive .
+      type: blocking
+    - cmd: ./bin/airdrive
+      type: primary
+      exit_policy: shutdown

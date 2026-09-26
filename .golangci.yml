@@ -1,0 +1,129 @@
+
+version: "2"
+linters:
+  default: none
+  enable:
+    - unparam
+    - dogsled
+    - errcheck
+    - goconst
+    - revive
+    - goprintffuncname
+    - gosec
+    - govet
+    - ineffassign
+    - lll
+    - misspell
+    - nakedret
+    - staticcheck
+    - unconvert
+    - unused
+    - whitespace
+    - errname
+    - dupword
+    - containedctx
+    - durationcheck
+    - errorlint
+    - sqlclosecheck
+  settings:
+    goconst:
+      min-len: 2
+      min-occurrences: 2
+    govet:
+      shadow: true
+      settings:
+        printf:
+          funcs:
+            - (github.com/golangci/golangci-lint/pkg/logutils.Log).Infof
+            - (github.com/golangci/golangci-lint/pkg/logutils.Log).Warnf
+            - (github.com/golangci/golangci-lint/pkg/logutils.Log).Errorf
+            - (github.com/golangci/golangci-lint/pkg/logutils.Log).Fatalf
+    lll:
+      line-length: 200
+    misspell:
+      locale: US
+    mnd:
+      checks:
+        - argument
+        - case
+        - condition
+        - return
+    revive:
+      rules:
+        - name: redefines-builtin-id
+          disabled: true
+        - name: nested-structs
+          disabled: true
+        - name: import-alias-naming
+          arguments: ["^(mock_)?[a-z][a-z0-9]{0,}$"]
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - third_party/.+\.go$
+      - builtin$
+      - examples$
+      - test/testdata_etc
+      - internal/renameio
+      - internal/robustio
+      - internal/ent
+      - tilt_modules
+      - mock
+    rules:
+      # Ignore some linters in test files
+      - path: _test\.go
+        linters:
+          - mnd
+          - bodyclose
+          - goconst
+          - gosec
+      # Ignore specific gosec false positives
+      - linters: [gosec]
+        text: G107 # http.Get(url) false positives
+      - linters: [gosec]
+        text: G112 # Potential Slowloris Attack
+      - linters: [gosec]
+        text: "G109: Potential Integer overflow made by strconv.Atoi result conversion to int16/32"
+      - linters: [gosec]
+        text: "G115: integer overflow conversion"
+      # Ignore unparam errors about constant params in tests
+      - linters: [unparam]
+        text: "always receives"
+      # Ignore dupword CURRENT_TIMESTAMP
+      - linters: [dupword]
+        text: "CURRENT_TIMESTAMP"
+      # Ignore revive redundant if-return on errors
+      - linters: [revive]
+        text: "redundant if ...; err != nil check, just return error instead."
+      # Ignore govet warning about non-constant format strings in log messages
+      - linters: [govet]
+        text: "printf: non-constant format string in call"
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - gofumpt
+    - golines
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(github.com/radosny/airdrive)
+    gofumpt:
+      extra-rules: true
+    golines:
+      max-len: 201
+      shorten-comments: true
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - third_party/.+\.go$
+      - builtin$
+      - examples$
