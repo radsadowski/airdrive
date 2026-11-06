@@ -49,6 +49,7 @@ jobs:
 
       - name: Create DMG
         run: |
+          mkdir -p dist
           create-dmg \
             --volname "AirDrive" \
             --window-pos 200 120 \
