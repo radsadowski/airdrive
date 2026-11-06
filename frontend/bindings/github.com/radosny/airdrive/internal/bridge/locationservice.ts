@@ -122,7 +122,9 @@ export function StarredGdriveFolders(sessionID: string): $CancellablePromise<ent
 
 /**
  * TestS3Connection validates credentials by listing buckets; a failed
- * connection is a result, not an error.
+ * connection is a result, not an error. Failures log server-side with the
+ * connection parameters (never the secret) plus the request id Cloudflare
+ * can correlate in the R2 dashboard.
  */
 export function TestS3Connection(cfg: entities$0.S3Config): $CancellablePromise<entities$0.S3TestResult | null> {
     return $Call.ByID(2390044261, cfg).then(($result: any) => {

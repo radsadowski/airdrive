@@ -6,6 +6,50 @@
 import { Create as $Create } from "@wailsio/runtime";
 
 /**
+ * EnqueueRequest is the frontend's transfer enqueue payload.
+ */
+export class EnqueueRequest {
+    "action": string;
+    "fileIds": string[];
+    "destLocationId": string;
+    "destDirId": string;
+    "conflictPolicy": string;
+
+    /** Creates a new EnqueueRequest instance. */
+    constructor($$source: Partial<EnqueueRequest> = {}) {
+        if (!("action" in $$source)) {
+            this["action"] = "";
+        }
+        if (!("fileIds" in $$source)) {
+            this["fileIds"] = [];
+        }
+        if (!("destLocationId" in $$source)) {
+            this["destLocationId"] = "";
+        }
+        if (!("destDirId" in $$source)) {
+            this["destDirId"] = "";
+        }
+        if (!("conflictPolicy" in $$source)) {
+            this["conflictPolicy"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new EnqueueRequest instance from a string or object.
+     */
+    static createFrom($$source: any = {}): EnqueueRequest {
+        const $$createField1_0 = $$createType0;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("fileIds" in $$parsedSource) {
+            $$parsedSource["fileIds"] = $$createField1_0($$parsedSource["fileIds"]);
+        }
+        return new EnqueueRequest($$parsedSource as Partial<EnqueueRequest>);
+    }
+}
+
+/**
  * File mirrors the TypeScript FileInfo contract.
  */
 export class File {
@@ -199,7 +243,7 @@ export class Page {
      * Creates a new Page instance from a string or object.
      */
     static createFrom($$source: any = {}): Page {
-        const $$createField0_0 = $$createType1;
+        const $$createField0_0 = $$createType2;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("items" in $$parsedSource) {
             $$parsedSource["items"] = $$createField0_0($$parsedSource["items"]);
@@ -281,7 +325,7 @@ export class S3TestResult {
      * Creates a new S3TestResult instance from a string or object.
      */
     static createFrom($$source: any = {}): S3TestResult {
-        const $$createField1_0 = $$createType2;
+        const $$createField1_0 = $$createType0;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("buckets" in $$parsedSource) {
             $$parsedSource["buckets"] = $$createField1_0($$parsedSource["buckets"]);
@@ -290,7 +334,51 @@ export class S3TestResult {
     }
 }
 
+/**
+ * Settings mirrors the frontend Settings contract.
+ */
+export class Settings {
+    "theme": string;
+    "defaultView": string;
+    "concurrentTransfers": number;
+    "bandwidthLimitMbps": number;
+    "showHiddenFiles": boolean;
+    "downloadDir": string;
+
+    /** Creates a new Settings instance. */
+    constructor($$source: Partial<Settings> = {}) {
+        if (!("theme" in $$source)) {
+            this["theme"] = "";
+        }
+        if (!("defaultView" in $$source)) {
+            this["defaultView"] = "";
+        }
+        if (!("concurrentTransfers" in $$source)) {
+            this["concurrentTransfers"] = 0;
+        }
+        if (!("bandwidthLimitMbps" in $$source)) {
+            this["bandwidthLimitMbps"] = 0;
+        }
+        if (!("showHiddenFiles" in $$source)) {
+            this["showHiddenFiles"] = false;
+        }
+        if (!("downloadDir" in $$source)) {
+            this["downloadDir"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Settings instance from a string or object.
+     */
+    static createFrom($$source: any = {}): Settings {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new Settings($$parsedSource as Partial<Settings>);
+    }
+}
+
 // Private type creation functions
-const $$createType0 = File.createFrom;
-const $$createType1 = $Create.Array($$createType0);
-const $$createType2 = $Create.Array($Create.Any);
+const $$createType0 = $Create.Array($Create.Any);
+const $$createType1 = File.createFrom;
+const $$createType2 = $Create.Array($$createType1);

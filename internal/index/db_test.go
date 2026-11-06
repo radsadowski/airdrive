@@ -208,3 +208,120 @@ func TestWhenTwoLocationsShareAFileIDThenBothRowsSurvive(t *testing.T) {
 	_, err = db.FileByID(ctx, "L2", "backup/photo.jpg")
 	r.NoError(err, "the other location's row survives")
 }
+
+func TestWhenAFileWithAnMD5IsStoredThenItRoundTrips(t *testing.T) {
+	t.Parallel()
+	r := require.New(t)
+	db := openTestDB(t)
+	ctx := context.Background()
+	seedLocation(t, db, "L1", "{}")
+
+	err := db.UpsertFile(ctx, provider.FileInfo{
+		ID: "F1", LocationID: "L1", Name: "a.png",
+		Kind: provider.FileKindFile, Etag: "v7", MD5: "d41d8cd98f00b204e9800998ecf8427e",
+	})
+	r.NoError(err)
+
+	got, err := db.FileByID(ctx, "L1", "F1")
+	r.NoError(err)
+	r.Equal("d41d8cd98f00b204e9800998ecf8427e", got.MD5)
+}
+
+func TestWhenATransferBatchIsCreatedThenJobsPersistWithIt(t *testing.T) {
+	t.Parallel()
+	r := require.New(t)
+	db := openTestDB(t)
+	ctx := context.Background()
+
+	batch := TransferBatch{
+		ID: "B1", Action: "copy", Conflict: "smart", DeleteSource: false,
+		SourceLocID: "SRC", DestLocID: "DST", DestDirID: "",
+	}
+	jobs := []TransferJob{
+		{ID: "J1", BatchID: "B1", SourceFileID: "F1", SourceName: "a.png", SourceLocID: "SRC", DestLocID: "DST", DestPath: "a.png", BytesTotal: 100},
+		{ID: "J2", BatchID: "B1", SourceFileID: "F2", SourceName: "b/c.txt", SourceLocID: "SRC", DestLocID: "DST", DestPath: "b/c.txt", BytesTotal: 200},
+	}
+	r.NoError(db.CreateTransferBatch(ctx, batch, jobs))
+
+	got, err := db.JobsForBatches(ctx, []string{"B1"})
+	r.NoError(err)
+	r.Len(got, 2)
+	r.Equal("pending", got[0].State)
+	r.Equal(int64(100), got[0].BytesTotal)
+
+	pending, err := db.NextPendingJobs(ctx, 10)
+	r.NoError(err)
+	r.Len(pending, 2)
+
+	r.NoError(db.UpdateTransferJobState(ctx, "J1", "done", true, ""))
+	r.NoError(db.UpdateTransferJobProgress(ctx, "J2", 150, 200))
+
+	pending, err = db.NextPendingJobs(ctx, 10)
+	r.NoError(err)
+	r.Len(pending, 1, "done jobs are not pending")
+	r.Equal("J2", pending[0].ID)
+
+	got, err = db.JobsForBatches(ctx, []string{"B1"})
+	r.NoError(err)
+	byID := map[string]TransferJob{}
+	for _, j := range got {
+		byID[j.ID] = j
+	}
+	r.True(byID["J1"].MD5Verified)
+	r.Equal(int64(150), byID["J2"].BytesDone)
+}
+
+func TestWhenBatchesAreListedThenCountsComeComputed(t *testing.T) {
+	t.Parallel()
+	r := require.New(t)
+	db := openTestDB(t)
+	ctx := context.Background()
+
+	r.NoError(db.CreateTransferBatch(ctx, TransferBatch{ID: "B1", Action: "copy", Conflict: "smart"}, []TransferJob{
+		{ID: "J1", BatchID: "B1", SourceName: "a", SourceLocID: "S", DestLocID: "D"},
+		{ID: "J2", BatchID: "B1", SourceName: "b", SourceLocID: "S", DestLocID: "D"},
+		{ID: "J3", BatchID: "B1", SourceName: "c", SourceLocID: "S", DestLocID: "D"},
+	}))
+	r.NoError(db.UpdateTransferJobState(ctx, "J1", "done", true, ""))
+	r.NoError(db.UpdateTransferJobState(ctx, "J2", "failed", false, "boom"))
+	r.NoError(db.UpdateTransferJobState(ctx, "J3", "skipped", false, ""))
+
+	batches, err := db.ListTransferBatches(ctx)
+	r.NoError(err)
+	r.Len(batches, 1)
+	r.Equal(1, batches[0].Done)
+	r.Equal(1, batches[0].Failed)
+	r.Equal(1, batches[0].Skipped)
+	r.Equal(3, batches[0].Total)
+}
+
+func TestWhenInterruptedTransfersAreFailedThenRunningAndPausedFlip(t *testing.T) {
+	t.Parallel()
+	r := require.New(t)
+	db := openTestDB(t)
+	ctx := context.Background()
+
+	r.NoError(db.CreateTransferBatch(ctx, TransferBatch{ID: "B1", Action: "copy"}, []TransferJob{
+		{ID: "J1", BatchID: "B1", SourceName: "a", SourceLocID: "S", DestLocID: "D"},
+		{ID: "J2", BatchID: "B1", SourceName: "b", SourceLocID: "S", DestLocID: "D"},
+		{ID: "J3", BatchID: "B1", SourceName: "c", SourceLocID: "S", DestLocID: "D"},
+	}))
+	r.NoError(db.UpdateTransferJobState(ctx, "J1", "running", false, ""))
+	r.NoError(db.UpdateTransferJobState(ctx, "J2", "paused", false, ""))
+	r.NoError(db.UpdateTransferJobState(ctx, "J3", "done", true, ""))
+
+	n, err := db.FailInterruptedTransfers(ctx, "interrupted by app restart")
+	r.NoError(err)
+	r.Equal(int64(2), n)
+
+	got, err := db.JobsForBatches(ctx, []string{"B1"})
+	r.NoError(err)
+	for _, j := range got {
+		if j.ID == "J3" {
+			r.Equal("done", j.State)
+		} else {
+			r.Equal("failed", j.State)
+			r.Contains(j.Error, "interrupted")
+		}
+	}
+}

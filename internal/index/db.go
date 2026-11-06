@@ -262,16 +262,16 @@ func (d *DB) DeleteFilesNotIn(ctx context.Context, locationID string, keep []str
 // UpsertFile inserts or replaces a file row and keeps FTS in sync.
 func (d *DB) UpsertFile(ctx context.Context, f provider.FileInfo) error {
 	_, err := d.db.ExecContext(ctx,
-		`INSERT INTO files(id,location_id,parent_id,name,kind,size,mime,etag,preview_kind,modified_at)
-		 VALUES(?,?,?,?,?,?,?,?,?,?)
+		`INSERT INTO files(id,location_id,parent_id,name,kind,size,mime,etag,md5,preview_kind,modified_at)
+		 VALUES(?,?,?,?,?,?,?,?,?,?,?)
 		 ON CONFLICT(location_id, id) DO UPDATE SET
 		   parent_id=excluded.parent_id, name=excluded.name,
 		   kind=excluded.kind, size=excluded.size, mime=excluded.mime,
-		   etag=excluded.etag, preview_kind=excluded.preview_kind,
+		   etag=excluded.etag, md5=excluded.md5, preview_kind=excluded.preview_kind,
 		   modified_at=excluded.modified_at,
 		   indexed_at=strftime('%Y-%m-%dT%H:%M:%SZ','now')`,
 		f.ID, f.LocationID, f.ParentID, f.Name,
-		string(f.Kind), f.Size, f.MIME, f.Etag, f.PreviewKind,
+		string(f.Kind), f.Size, f.MIME, f.Etag, f.MD5, f.PreviewKind,
 		f.ModifiedAt.UTC().Format(time.RFC3339),
 	)
 	return err
@@ -297,7 +297,7 @@ func (d *DB) DeleteChildrenOf(ctx context.Context, locationID, dirPath string) e
 // FileByID returns a single file of a location or sql.ErrNoRows.
 func (d *DB) FileByID(ctx context.Context, locationID, fileID string) (provider.FileInfo, error) {
 	row := d.db.QueryRowContext(ctx,
-		`SELECT id,location_id,parent_id,name,kind,size,mime,etag,preview_kind,modified_at
+		`SELECT id,location_id,parent_id,name,kind,size,mime,etag,md5,preview_kind,modified_at
 		 FROM files WHERE location_id=? AND id=?`, locationID, fileID)
 	return scanFile(row)
 }
@@ -333,7 +333,7 @@ func (d *DB) ListDir(ctx context.Context, locationID, parentID string, sort prov
 		hiddenClause = " AND name NOT LIKE '.%'"
 	}
 
-	q := "SELECT id,location_id,parent_id,name,kind,size,mime,etag,preview_kind,modified_at" + //nolint:gosec // orderCol/orderDir/hiddenClause are enum-derived, never user input
+	q := "SELECT id,location_id,parent_id,name,kind,size,mime,etag,md5,preview_kind,modified_at" + //nolint:gosec // orderCol/orderDir/hiddenClause are enum-derived, never user input
 		" FROM files" +
 		" WHERE location_id=? AND parent_id=?" + hiddenClause +
 		" ORDER BY CASE kind WHEN 'dir' THEN 0 ELSE 1 END, " + orderCol + " " + orderDir +
@@ -472,6 +472,219 @@ type SearchQuery struct {
 	Cursor       string
 }
 
+// ---- Transfers ------------------------------------------------------------ //
+
+// TransferBatch mirrors the transfer_batches row plus computed job counts.
+type TransferBatch struct {
+	ID                                     string
+	Action                                 string // copy | move | upload
+	Conflict                               string // smart | overwrite | skip
+	DeleteSource                           bool
+	SourceLocID                            string
+	DestLocID                              string
+	DestDirID                              string
+	CreatedAt                              time.Time
+	Total, Done, Failed, Skipped, Canceled int
+}
+
+// TransferJob mirrors the transfers row.
+type TransferJob struct {
+	ID           string
+	BatchID      string
+	SourceFileID string
+	SourceItemID string // the selection item this job descended from
+	SourceName   string
+	SourceLocID  string
+	DestLocID    string
+	DestDirID    string
+	DestPath     string
+	State        string // pending|running|done|failed|skipped|canceled|paused
+	BytesTotal   int64
+	BytesDone    int64
+	MD5Verified  bool
+	Error        string
+	UpdatedAt    time.Time
+}
+
+// CreateTransferBatch persists a batch and its jobs atomically.
+func (d *DB) CreateTransferBatch(ctx context.Context, b TransferBatch, jobs []TransferJob) error {
+	now := time.Now().UTC().Format(time.RFC3339)
+	tx, err := d.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("create transfer batch: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	for i := range jobs {
+		jobs[i].BatchID = b.ID
+	}
+	if _, err := tx.ExecContext(ctx,
+		`INSERT INTO transfer_batches(id, action, conflict, delete_source, source_loc_id, dest_loc_id, dest_dir_id, created_at)
+		 VALUES(?,?,?,?,?,?,?,?)`,
+		b.ID, b.Action, b.Conflict, b.DeleteSource, b.SourceLocID, b.DestLocID, b.DestDirID, now,
+	); err != nil {
+		return fmt.Errorf("create transfer batch: %w", err)
+	}
+	for _, j := range jobs {
+		if _, err := tx.ExecContext(
+			ctx,
+			`INSERT INTO transfers(id, batch_id, source_file_id, source_name,
+				source_loc_id, dest_loc_id, dest_dir_id, dest_path, state, bytes_total,
+				bytes_done, md5_verified, error, source_item_id, created_at, updated_at)
+				VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			j.ID,
+			j.BatchID,
+			j.SourceFileID,
+			j.SourceName,
+			j.SourceLocID,
+			j.DestLocID,
+			j.DestDirID,
+			j.DestPath,
+			"pending",
+			j.BytesTotal,
+			0,
+			0,
+			"",
+			j.SourceItemID,
+			now,
+			now,
+		); err != nil {
+			return fmt.Errorf("create transfer job %q: %w", j.ID, err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("create transfer batch: %w", err)
+	}
+	return nil
+}
+
+// NextPendingJobs returns up to limit pending jobs for dispatch.
+func (d *DB) NextPendingJobs(ctx context.Context, limit int) ([]TransferJob, error) {
+	rows, err := d.db.QueryContext(ctx,
+		`SELECT id,batch_id,source_file_id,source_name,source_loc_id,dest_loc_id,dest_dir_id,dest_path,state,bytes_total,bytes_done,md5_verified,error,updated_at,source_item_id
+		 FROM transfers WHERE state='pending' ORDER BY created_at LIMIT ?`, limit)
+	if err != nil {
+		return nil, fmt.Errorf("next pending jobs: %w", err)
+	}
+	defer rows.Close()
+	return scanTransferJobs(rows)
+}
+
+// UpdateTransferJobState sets a job's terminal or intermediate state.
+func (d *DB) UpdateTransferJobState(ctx context.Context, jobID, state string, md5Verified bool, errMsg string) error {
+	_, err := d.db.ExecContext(ctx,
+		`UPDATE transfers SET state=?, md5_verified=?, error=?, updated_at=strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE id=?`,
+		state, md5Verified, errMsg, jobID)
+	if err != nil {
+		return fmt.Errorf("update transfer job state: %w", err)
+	}
+	return nil
+}
+
+// UpdateTransferJobProgress advances the byte counter.
+func (d *DB) UpdateTransferJobProgress(ctx context.Context, jobID string, bytesDone, bytesTotal int64) error {
+	_, err := d.db.ExecContext(ctx,
+		`UPDATE transfers SET bytes_done=?, bytes_total=?, updated_at=strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE id=?`,
+		bytesDone, bytesTotal, jobID)
+	if err != nil {
+		return fmt.Errorf("update transfer job progress: %w", err)
+	}
+	return nil
+}
+
+// JobsForBatches returns all jobs of the given batches.
+func (d *DB) JobsForBatches(ctx context.Context, batchIDs []string) ([]TransferJob, error) {
+	if len(batchIDs) == 0 {
+		return nil, nil
+	}
+	placeholders := strings.Repeat("?,", len(batchIDs))
+	placeholders = placeholders[:len(placeholders)-1]
+	args := make([]any, 0, len(batchIDs))
+	for _, id := range batchIDs {
+		args = append(args, id)
+	}
+	//nolint:gosec // placeholders are count-derived, never user input (same pattern as ListDir)
+	rows, err := d.db.QueryContext(ctx,
+		`SELECT id,batch_id,source_file_id,source_name,source_loc_id,dest_loc_id,dest_dir_id,dest_path,state,bytes_total,bytes_done,md5_verified,error,updated_at,source_item_id
+		 FROM transfers WHERE batch_id IN (`+placeholders+`) ORDER BY created_at`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("jobs for batches: %w", err)
+	}
+	defer rows.Close()
+	return scanTransferJobs(rows)
+}
+
+// ListTransferBatches returns all batches with computed job counts.
+func (d *DB) ListTransferBatches(ctx context.Context) ([]TransferBatch, error) {
+	rows, err := d.db.QueryContext(ctx,
+		`SELECT b.id, b.action, b.conflict, b.delete_source, b.source_loc_id, b.dest_loc_id, b.dest_dir_id, b.created_at,
+		   COALESCE(SUM(t.state='done'),0), COALESCE(SUM(t.state='failed'),0), COALESCE(SUM(t.state='skipped'),0), COALESCE(SUM(t.state='canceled'),0), COUNT(t.id)
+		 FROM transfer_batches b LEFT JOIN transfers t ON t.batch_id = b.id
+		 GROUP BY b.id ORDER BY b.created_at DESC`)
+	if err != nil {
+		return nil, fmt.Errorf("list transfer batches: %w", err)
+	}
+	defer rows.Close()
+	var out []TransferBatch
+	for rows.Next() {
+		var b TransferBatch
+		var createdAt string
+		if err := rows.Scan(&b.ID, &b.Action, &b.Conflict, &b.DeleteSource, &b.SourceLocID, &b.DestLocID, &b.DestDirID, &createdAt,
+			&b.Done, &b.Failed, &b.Skipped, &b.Canceled, &b.Total); err != nil {
+			return nil, fmt.Errorf("list transfer batches: %w", err)
+		}
+		b.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
+		out = append(out, b)
+	}
+	return out, rows.Err()
+}
+
+// FailInterruptedTransfers flips running/paused jobs to failed at startup.
+func (d *DB) FailInterruptedTransfers(ctx context.Context, reason string) (int64, error) {
+	res, err := d.db.ExecContext(ctx,
+		`UPDATE transfers SET state='failed', error=?, updated_at=strftime('%Y-%m-%dT%H:%M:%SZ','now')
+		 WHERE state IN ('running','paused')`, reason)
+	if err != nil {
+		return 0, fmt.Errorf("fail interrupted transfers: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("fail interrupted transfers: %w", err)
+	}
+	return n, nil
+}
+
+func scanTransferJobs(rows *sql.Rows) ([]TransferJob, error) {
+	var out []TransferJob
+	for rows.Next() {
+		var j TransferJob
+		var updated string
+		var md5 int
+		if err := rows.Scan(
+			&j.ID,
+			&j.BatchID,
+			&j.SourceFileID,
+			&j.SourceName,
+			&j.SourceLocID,
+			&j.DestLocID,
+			&j.DestDirID,
+			&j.DestPath,
+			&j.State,
+			&j.BytesTotal,
+			&j.BytesDone,
+			&md5,
+			&j.Error,
+			&updated,
+			&j.SourceItemID,
+		); err != nil {
+			return nil, err
+		}
+		j.MD5Verified = md5 != 0
+		j.UpdatedAt, _ = time.Parse(time.RFC3339, updated)
+		out = append(out, j)
+	}
+	return out, rows.Err()
+}
+
 // ---- helpers ------------------------------------------------------------- //
 
 type scanner interface {
@@ -487,7 +700,7 @@ func scanFileRow(s scanner) (provider.FileInfo, error) {
 	var kind, modAt string
 	if err := s.Scan(
 		&f.ID, &f.LocationID, &f.ParentID, &f.Name,
-		&kind, &f.Size, &f.MIME, &f.Etag, &f.PreviewKind, &modAt,
+		&kind, &f.Size, &f.MIME, &f.Etag, &f.MD5, &f.PreviewKind, &modAt,
 	); err != nil {
 		return provider.FileInfo{}, err
 	}

@@ -13,7 +13,7 @@ import (
 )
 
 // fileFields is the field mask every metadata request asks for.
-const fileFields = "id,name,mimeType,parents,size,modifiedTime,version"
+const fileFields = "id,name,mimeType,parents,size,modifiedTime,version,md5Checksum"
 
 // parentID maps "" to the resolved root ID for parents fields (the "root"
 // alias is only reliable in query filters).

@@ -208,7 +208,18 @@ func (p *Provider) toFileInfo(key string, size int64, etag string, mod time.Time
 		Size:        size,
 		MIME:        mime,
 		Etag:        etag,
+		MD5:         plainMD5FromEtag(etag),
 		PreviewKind: provider.PreviewKind(mime),
 		ModifiedAt:  mod,
 	}
+}
+
+// plainMD5FromEtag strips quotes from an ETag when it is a plain MD5;
+// multipart ETags contain a hyphen and are not MD5s.
+func plainMD5FromEtag(etag string) string {
+	unquoted := strings.Trim(etag, `"`)
+	if len(unquoted) == 32 && !strings.Contains(unquoted, "-") {
+		return unquoted
+	}
+	return ""
 }

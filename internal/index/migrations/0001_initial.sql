@@ -19,6 +19,7 @@ CREATE TABLE files (
     size         INTEGER NOT NULL DEFAULT 0,
     mime         TEXT NOT NULL DEFAULT '',
     etag         TEXT NOT NULL DEFAULT '',
+    md5          TEXT NOT NULL DEFAULT '',
     preview_kind TEXT NOT NULL DEFAULT '',
     modified_at  TEXT NOT NULL,
     indexed_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
@@ -63,6 +64,7 @@ CREATE TABLE transfers (
     batch_id         TEXT NOT NULL,
     source_file_id   TEXT NOT NULL,
     source_name      TEXT NOT NULL,
+    source_item_id    TEXT NOT NULL DEFAULT '', -- the selection item the job descended from
     source_loc_id    TEXT NOT NULL,
     dest_loc_id      TEXT NOT NULL,
     dest_dir_id      TEXT NOT NULL DEFAULT '',

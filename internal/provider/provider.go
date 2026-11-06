@@ -44,6 +44,7 @@ type FileInfo struct {
 	//   gdrive  → Drive revision ID
 	//   s3      → ETag from S3 (may not be MD5 for multipart)
 	Etag        string
+	MD5         string // content checksum when the provider exposes one
 	PreviewKind string // "image" | "text" | "pdf" | "video" | "audio" | "binary"
 }
 

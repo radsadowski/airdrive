@@ -74,3 +74,22 @@ type S3TestResult struct {
 	Buckets []string `json:"buckets"`
 	Error   string   `json:"error,omitempty"`
 }
+
+// EnqueueRequest is the frontend's transfer enqueue payload.
+type EnqueueRequest struct {
+	Action         string   `json:"action"`
+	FileIDs        []string `json:"fileIds"`
+	DestLocationID string   `json:"destLocationId"`
+	DestDirID      string   `json:"destDirId"`
+	ConflictPolicy string   `json:"conflictPolicy"`
+}
+
+// Settings mirrors the frontend Settings contract.
+type Settings struct {
+	Theme               string `json:"theme"`
+	DefaultView         string `json:"defaultView"`
+	ConcurrentTransfers int    `json:"concurrentTransfers"`
+	BandwidthLimitMbps  int    `json:"bandwidthLimitMbps"`
+	ShowHiddenFiles     bool   `json:"showHiddenFiles"`
+	DownloadDir         string `json:"downloadDir"`
+}

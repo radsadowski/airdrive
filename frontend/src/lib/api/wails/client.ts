@@ -8,6 +8,8 @@ import { Events } from '@wailsio/runtime'
 import type { ApiClient, AppEventMap, AppEventName, EventBus, FileInfo, GdriveSession, Location, Page, S3LocationConfig, Settings } from '../contract'
 import * as LocSvc from '@bindings/github.com/radosny/airdrive/internal/bridge/locationservice'
 import * as FileSvc from '@bindings/github.com/radosny/airdrive/internal/bridge/fileservice'
+import * as XferSvc from '@bindings/github.com/radosny/airdrive/internal/bridge/transferservice'
+import * as SettingsSvc from '@bindings/github.com/radosny/airdrive/internal/bridge/settingsservice'
 import type { File as EntityFile, Location as EntityLocation, Page as EntityPage } from '@bindings/github.com/radosny/airdrive/internal/entities/models'
 
 // ---- shape adapters ------------------------------------------------------ //
@@ -162,22 +164,44 @@ class WailsClientImpl implements ApiClient, EventBus {
     return { targets: targets ?? [] }
   }
 
-  async uploadFiles(_locationId: string, _destDirId: string | null, _files: { name: string; size: number }[]): Promise<void> {
-    // Phase 6: real upload via transfer manager
-    throw new Error('Upload — coming in Phase 6')
+  async uploadFiles(locationId: string, destDirId: string | null, files: { name: string; size: number }[]): Promise<void> {
+    // Upload goes through the transfer engine as a batch of local file jobs.
+    // The picker/drag-drop provides paths, not File objects; this call path
+    // is exercised by the toolbar Upload button and drop targets.
+    const paths = files.map((f) => f.name)
+    await XferSvc.EnqueueUpload(locationId, destDirId ?? '', paths)
   }
 
   // ---- Transfers (Phase 6) ---- //
 
-  async enqueueTransfer(): Promise<{ batchId: string }> {
-    throw new Error('Transfer manager — coming in Phase 6')
+  async enqueueTransfer(req: Parameters<ApiClient['enqueueTransfer']>[0]): Promise<{ batchId: string }> {
+    const batchId = await XferSvc.Enqueue(req as any)
+    return { batchId }
   }
-  async pauseBatch(): Promise<void> { throw new Error('Phase 6') }
-  async resumeBatch(): Promise<void> { throw new Error('Phase 6') }
-  async cancelBatch(): Promise<void> { throw new Error('Phase 6') }
-  async retryFailed(): Promise<void> { throw new Error('Phase 6') }
-  async listBatches() { return [] }
-  async listJobs() { return [] }
+  async pauseBatch(batchId: string): Promise<void> { await XferSvc.PauseBatch(batchId) }
+  async resumeBatch(batchId: string): Promise<void> { await XferSvc.ResumeBatch(batchId) }
+  async cancelBatch(batchId: string): Promise<void> { await XferSvc.CancelBatch(batchId) }
+  async retryFailed(batchId: string): Promise<void> { await XferSvc.RetryFailed(batchId) }
+  async listBatches() {
+    const batches = await XferSvc.ListBatches()
+    return (batches ?? []).map((b: any) => ({
+      id: b.id, action: b.action, createdAt: b.createdAt,
+      sourceLocationId: b.sourceLocId, destLocationId: b.destLocId,
+      destDirId: b.destDirId || null, destName: '',
+      conflictPolicy: b.conflict, deleteSource: b.deleteSource,
+      jobIds: [],
+    }))
+  }
+  async listJobs(batchIds: string[]) {
+    const jobs = await XferSvc.ListJobs(batchIds)
+    return (jobs ?? []).map((j: any) => ({
+      id: j.id, batchId: j.batchId, sourceFileId: j.sourceFileId,
+      sourceName: j.sourceName, sourceLocationId: j.sourceLocId,
+      destLocationId: j.destLocId, destPath: j.destPath,
+      state: j.state, bytesTotal: j.bytesTotal, bytesDone: j.bytesDone,
+      speed: 0, md5Verified: j.md5Verified, error: j.error || undefined,
+    }))
+  }
 
   // ---- Search ---- //
 
@@ -196,24 +220,24 @@ class WailsClientImpl implements ApiClient, EventBus {
     return toPage(requireNonNull(page, 'search'))
   }
 
-  // ---- Settings (Phase 2: in-memory only, persisted in Phase 7) ---- //
-
-  private settings: Settings = {
-    theme: 'dark',
-    defaultView: 'list',
-    concurrentTransfers: 3,
-    bandwidthLimitMbps: 80,
-    showHiddenFiles: false,
-    downloadDir: `${window.location.hostname}/Downloads`,
-  }
+  // ---- Settings (persisted via SettingsService) ---- //
 
   async getSettings(): Promise<Settings> {
-    return { ...this.settings }
+    const s = await SettingsSvc.Get()
+    return {
+      ...s,
+      theme: s.theme as Settings['theme'],
+      defaultView: s.defaultView as Settings['defaultView'],
+    }
   }
 
   async updateSettings(patch: Partial<Settings>): Promise<Settings> {
-    Object.assign(this.settings, patch)
-    return { ...this.settings }
+    const s = await SettingsSvc.Update(patch as Record<string, unknown>)
+    return {
+      ...s,
+      theme: s.theme as Settings['theme'],
+      defaultView: s.defaultView as Settings['defaultView'],
+    }
   }
 }
 

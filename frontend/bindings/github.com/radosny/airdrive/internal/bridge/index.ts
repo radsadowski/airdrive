@@ -4,8 +4,12 @@
 import * as AppService from "./appservice.js";
 import * as FileService from "./fileservice.js";
 import * as LocationService from "./locationservice.js";
+import * as SettingsService from "./settingsservice.js";
+import * as TransferService from "./transferservice.js";
 export {
     AppService,
     FileService,
-    LocationService
+    LocationService,
+    SettingsService,
+    TransferService
 };

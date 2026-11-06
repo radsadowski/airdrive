@@ -151,3 +151,16 @@ func TestWhenADriveFileIsMappedThenItBecomesAFileInfo(t *testing.T) {
 		})
 	}
 }
+
+func TestWhenADriveFileIsMappedThenItsMD5ChecksumComesThrough(t *testing.T) {
+	t.Parallel()
+	r := require.New(t)
+	p := &Provider{locationID: "loc1", rootID: "ROOTID"}
+
+	fi := p.toFileInfo(&drive.File{
+		Id: "B1", Name: "a.png", MimeType: "image/png",
+		Parents: []string{"ROOTID"}, Size: 123, Version: 7,
+		Md5Checksum: "d41d8cd98f00b204e9800998ecf8427e",
+	})
+	r.Equal("d41d8cd98f00b204e9800998ecf8427e", fi.MD5)
+}

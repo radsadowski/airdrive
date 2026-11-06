@@ -133,6 +133,7 @@ func (p *Provider) toFileInfo(f *drive.File) provider.FileInfo {
 		Size:        f.Size,
 		MIME:        f.MimeType,
 		Etag:        strconv.FormatInt(f.Version, 10),
+		MD5:         f.Md5Checksum,
 		PreviewKind: preview,
 		ModifiedAt:  modified,
 	}

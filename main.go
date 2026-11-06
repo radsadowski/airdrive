@@ -52,6 +52,18 @@ func main() {
 	}
 	go thumbs.Sweep()
 
+	settingsSvc, err := bridge.NewSettingsService(dataDir, logger)
+	if err != nil {
+		log.Fatal("settings:", err)
+	}
+	transfers := bridge.NewTransferService(db, registry, logger, func() bridge.TransferSettings {
+		cfg, cErr := settingsSvc.Get()
+		if cErr != nil {
+			return bridge.TransferSettings{ConcurrentTransfers: 3, BandwidthLimitMbps: 80}
+		}
+		return bridge.TransferSettings{ConcurrentTransfers: cfg.ConcurrentTransfers, BandwidthLimitMbps: cfg.BandwidthLimitMbps}
+	})
+
 	// Watcher is created before the app so it can be passed into services.
 	// The onChange callback emits fs:changed via the app — set after New.
 	var appRef *application.App
@@ -84,6 +96,8 @@ func main() {
 			application.NewService(appSvc),
 			application.NewService(locSvc),
 			application.NewService(fileSvc),
+			application.NewService(transfers),
+			application.NewService(settingsSvc),
 		},
 		Assets: application.AssetOptions{
 			Handler:    application.AssetFileServerFS(assets),
@@ -99,6 +113,7 @@ func main() {
 	appSvc.SetApp(app)
 	locSvc.SetApp(app)
 	fileSvc.SetApp(app)
+	transfers.SetEmit(func(name string, data ...any) { app.Event.Emit(name, data...) })
 
 	app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:  "AirDrive",
@@ -111,6 +126,7 @@ func main() {
 		},
 		BackgroundColour: application.NewRGB(11, 12, 15),
 		URL:              "/",
+		EnableFileDrop:   true,
 	})
 
 	// Restore locations from the previous session (async so app starts fast).
@@ -118,6 +134,7 @@ func main() {
 		if err := locSvc.Restore(); err != nil {
 			logger.Error("restore locations", "err", err)
 		}
+		transfers.Interrupt("interrupted by app restart")
 	}()
 
 	app.Event.Emit(ev.AppReady, map[string]any{
