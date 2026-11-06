@@ -1,0 +1,47 @@
+version: '3'
+
+includes:
+  common: ../Taskfile.yml
+
+tasks:
+  build:
+    summary: Builds the macOS binary
+    deps:
+      - task: common:frontend:build
+    cmds:
+      - go build {{.BUILD_FLAGS}} -o "{{.OUTPUT}}" .
+    vars:
+      BUILD_FLAGS: '{{if eq .PRODUCTION "true"}}-tags production -trimpath -buildvcs=false -ldflags="-w -s"{{else}}-buildvcs=false -gcflags=all="-l"{{end}}'
+      DEFAULT_OUTPUT: '{{.BIN_DIR}}/{{.BINARY_NAME}}'
+      OUTPUT: '{{.OUTPUT | default .DEFAULT_OUTPUT}}'
+    env:
+      GOOS: darwin
+      CGO_ENABLED: 1
+      CGO_CFLAGS: "-mmacosx-version-min=12.0"
+      CGO_LDFLAGS: "-mmacosx-version-min=12.0"
+      MACOSX_DEPLOYMENT_TARGET: '12.0'
+      PRODUCTION: '{{.PRODUCTION | default "false"}}'
+
+  package:
+    summary: Packages the production build into an .app bundle
+    deps:
+      - task: build
+        vars: {PRODUCTION: 'true'}
+    cmds:
+      - task: create:app:bundle
+
+  # Ad-hoc signing is enough for a Homebrew-tap distribution; users bypass
+  # Gatekeeper once via right-click → Open (documented in README).
+  create:app:bundle:
+    summary: Creates and ad-hoc signs the .app bundle
+    cmds:
+      - mkdir -p "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/MacOS"
+      - cp "{{.BIN_DIR}}/{{.BINARY_NAME}}" "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/MacOS/{{.BINARY_NAME}}"
+      - cp build/darwin/Info.plist "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Info.plist"
+      - codesign --force --deep --sign - "{{.BIN_DIR}}/{{.APP_NAME}}.app"
+
+  run:
+    summary: Builds and runs the app bundle
+    cmds:
+      - task: build
+      - open "{{.BIN_DIR}}/{{.APP_NAME}}.app"

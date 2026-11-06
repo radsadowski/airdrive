@@ -1,0 +1,14 @@
+version: '3'
+
+tasks:
+  frontend:install:
+    summary: Installs frontend dependencies
+    cmds:
+      - npm --prefix frontend install
+
+  frontend:build:
+    summary: Builds frontend assets into frontend/dist
+    deps:
+      - task: frontend:install
+    cmds:
+      - npm --prefix frontend run build

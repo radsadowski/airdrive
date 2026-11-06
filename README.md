@@ -206,7 +206,11 @@ go test -race ./internal/... # with the race detector
 ### 📦 Building
 
 ```sh
-wails3 build
+wails3 package
 ```
 
-Produces a native macOS binary in `bin/`.
+Builds the frontend, compiles the production binary, and packages an
+ad-hoc signed app bundle at `bin/AirDrive.app`. The release workflow wraps
+that in a `.dmg` (`create-dmg`) and publishes it to GitHub Releases: every
+push to `master` refreshes the `nightly` pre-release, and every `v*.*.*`
+tag creates a stable release and updates the Homebrew tap.

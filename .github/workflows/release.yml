@@ -42,21 +42,10 @@ jobs:
       - name: Install create-dmg
         run: brew install create-dmg
 
-      - name: Build frontend assets
-        working-directory: frontend
-        run: |
-          npm ci
-          npm run build
-
-      - name: Build Wails app (macOS)
-        run: |
-          wails3 build -config ./build/config.yml
-
-      # Ad-hoc code signing is enough for a custom Homebrew tap.
-      # Users bypass Gatekeeper once via right-click → Open (documented in README).
-      - name: Ad-hoc sign the app bundle
-        run: |
-          codesign --force --deep --sign - "./bin/AirDrive.app"
+      # Builds frontend assets, compiles the Go binary with the production
+      # build tag, creates bin/AirDrive.app, and ad-hoc signs it.
+      - name: Build and package the app (wails3 package)
+        run: wails3 package
 
       - name: Create DMG
         run: |
