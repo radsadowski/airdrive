@@ -1,51 +1,100 @@
 # AirDrive
 
-A macOS desktop app that unifies **local folders**, **Google Drive**, and any
-**S3-compatible storage** (primary target: **Cloudflare R2**) into one
-file-manager UI — a Spacedrive-style manager for browsing, organizing, and
-eventually migrating files across all three.
+A macOS desktop app that unifies **local folders**, **Google Drive**, and
+**S3-compatible storage** (R2, MinIO, B2, AWS) into one file-manager UI —
+browse, search, organize, and transfer files across all three from a single
+native app.
 
-The initial goal (v1) is a fast, unified file manager with migration-grade
-transfers — built to move ~1M files / TBs off Google Drive onto R2 with
-resumable, verified, idempotent transfers. v2 turns R2 into a sync hub with
-two-way folder-pair sync across machines.
+Built with Wails v3 (Go backend + React/TypeScript webview), with a local
+SQLite index as the read path and migration-grade transfers that move files
+between providers with MD5 verification.
 
-> Status: early development. Local folders are fully wired end-to-end
-> (browse/index/watch); Google Drive is wired end-to-end too — sign-in with
-> a folder picker that scopes the location to one Drive folder (or all of
-> My Drive; starred folders — including Drive-for-desktop "Computers"
-> backups — are pickable and sync by subtree re-listing), browse/index/search
-> via SQLite, full CRUD, and incremental sync through Drive's changes feed.
-> S3-compatible buckets (R2/MinIO/B2/AWS via minio-go) are wired end-to-end:
-> test-connection + bucket locations with browse/search/CRUD, deletions to an
-> in-bucket `.airdrive-trash/` prefix, and reconcile refreshes that detect
-> remote deletions. Image thumbnails render in the browser for local and
-> Drive locations (Drive: server-side thumbnailLink; local: macOS `sips`),
-> served from an etag-keyed cache by the Go asset middleware. The transfer
-> engine is not implemented yet. See `.planning/` / the project plan for
-> phase-by-phase status.
+## Features
 
-## How it works
+### File management
+- **Browse & navigate** — folder trees across all connected locations,
+  instant listing from the local SQLite index (no network on click)
+- **Full-text search** — FTS5-powered search across every indexed file,
+  filterable by size, date, and kind
+- **File operations** — create, rename, move, and delete (to provider
+  trash, never permanent)
+- **Image thumbnails** — in the browser grid for local folders (via
+  macOS `sips`) and Google Drive (server-side thumbnails), served from
+  an etag-keyed cache
 
-AirDrive is a **Wails v3** app: a Go backend paired with a React/TypeScript
+### Storage providers
+- **Local folders** — indexed with fsnotify live watching
+- **Google Drive** — OAuth sign-in with a folder picker that scopes
+  the location to one Drive folder or all of My Drive; starred folders
+  (including Drive-for-desktop "Computers" backups) are pickable
+- **S3-compatible buckets** — R2, MinIO, B2, or AWS via connection
+  testing with bucket listing; deletions go to an in-bucket
+  `.airdrive-trash/` prefix
+
+### Transfers
+- **Copy & move** between any two locations (e.g. Drive → R2, local
+  → S3, S3 → local)
+- **Conflict policies** — smart (skip identical, keep both on difference),
+  overwrite, or skip existing
+- **MD5 verification** — content hash verified end-to-end during
+  transfer when the source exposes a checksum
+- **Progress & controls** — per-file byte progress with speed in the
+  transfers panel; pause, resume, cancel, and retry-failed
+- **Move semantics** — source items are trashed only after all their
+  files transfer successfully; a failed job keeps the source intact
+- **Uploads** — drag-and-drop files from Finder onto any location,
+  or use the Upload button with the native file picker
+
+### Security
+- **OAuth 2.0 with PKCE** for Google Drive — tokens live in the macOS
+  Keychain, never in SQLite
+- **S3 credentials** — access keys stored in the Keychain, never on
+  disk in plain text
+- **Never-permanent deletes** — local folders go to `~/.Trash`,
+  Drive to Drive's trash, S3 to the in-bucket trash prefix
+
+## Requirements
+
+- macOS (no Windows/Linux builds)
+- [Go](https://go.dev/) 1.26+
+- [Node.js](https://nodejs.org/) 20+
+- [Wails v3 CLI](https://v3alpha.wails.io/) `v3.0.0-beta.26`:
+  ```sh
+  go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.26
+  ```
+
+## Roadmap
+
+- **One-way folder sync** — sync a Drive folder into an S3 bucket;
+  Drive changes propagate, S3-side edits stay
+- **Two-way folder-pair sync** — R2 as a sync hub across machines
+- **Dropbox & OneDrive** — additional storage providers
+- **MCP server** — expose file search and management to AI agents
+  via the Model Context Protocol
+- **AI chat** — natural-language file search, summarization, and
+  analysis across all connected storage
+- **Smart organization** — AI-powered auto-tagging, duplicate
+  detection, and content-based file suggestions
+
+## Development
+
+### Architecture
+
+A **Wails v3** app: a Go backend paired with a React/TypeScript
 webview frontend, packaged as a single native macOS binary.
 
-- **Backend (Go)** — owns all real work: a local SQLite index (with FTS5
-  full-text search) is the single source of truth the UI reads from; a
-  filesystem watcher keeps it live; a `StorageProvider` abstraction lets
-  local folders, Google Drive, and S3-compatible buckets share one interface
-  for browsing/CRUD/transfers. Only one package (`internal/bridge`) is
-  allowed to import Wails — everything else is plain, testable Go.
-- **Frontend (React + TypeScript + Vite)** — never talks to Wails directly.
-  It calls a typed `ApiClient` contract that has two implementations: a
-  `WailsClient` (talks to the real Go backend via generated bindings) and a
-  `MockClient` (a fully stateful in-memory fake, so the whole UI can be
-  built and iterated on in a browser with `vite dev`, no Go required).
-- **Storage** — SQLite via `modernc.org/sqlite` (pure Go, no CGo) with
-  `pressly/goose` migrations; the index is disposable (rebuildable via
-  re-crawl) while transfer/journal state is precious and durable.
-- **UI** — Tailwind CSS (v4) + Zustand for state + TanStack Virtual for
-  large virtualized file lists.
+- **Backend (Go)** — a local SQLite index (FTS5 search) is the single
+  source of truth the UI reads from; a `StorageProvider` abstraction
+  lets local folders, Google Drive, and S3 buckets share one interface.
+  Only `internal/bridge` imports Wails — everything else is plain,
+  testable Go.
+- **Frontend (React + TS + Vite)** — calls a typed `ApiClient` contract
+  with two implementations: a `WailsClient` (real bindings) and a
+  `MockClient` (fully stateful in-memory app, so the entire UI runs
+  in a plain browser with `vite dev`, no Go required).
+- **Storage** — SQLite via `modernc.org/sqlite` (pure Go, no CGo);
+  the index is disposable (rebuildable by re-crawling) while transfer
+  state is durable.
 
 ### Tech stack
 
@@ -56,81 +105,59 @@ webview frontend, packaged as a single native macOS binary.
 | UI styling | Tailwind CSS v4 |
 | UI state | Zustand |
 | Virtualized lists | TanStack Virtual |
-| Local index / search | SQLite (`modernc.org/sqlite`) + FTS5 |
+| Index & search | SQLite + FTS5 |
 | Migrations | `pressly/goose` |
-| Local filesystem watching | `fsnotify` (debounced) |
-| Google Drive auth | `golang.org/x/oauth2` (PKCE) + `google.golang.org/api/drive/v3` |
-| S3-compatible storage | `github.com/minio/minio-go/v7` (user-sanctioned exception to stdlib-only) |
-| Credentials storage | macOS Keychain (`zalando/go-keyring`) |
-| Go tests | stdlib `testing` (parallel, table-driven) + `stretchr/testify` |
+| Filesystem watching | `fsnotify` (debounced) |
+| Google Drive | `golang.org/x/oauth2` + `google.golang.org/api/drive/v3` |
+| S3-compatible storage | `github.com/minio/minio-go/v7` |
+| Credentials | macOS Keychain (`zalando/go-keyring`) |
+| Testing | `stretchr/testify` + `go.uber.org/mock` |
 
-## Requirements
-
-- macOS (this app targets macOS only; no Windows/Linux builds)
-- [Go](https://go.dev/) 1.26+
-- [Node.js](https://nodejs.org/) 20+ (Vite/React frontend tooling)
-- [Wails v3 CLI](https://v3alpha.wails.io/), pinned to `v3.0.0-beta.26` to
-  match this repo:
-  ```sh
-  go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.26
-  ```
-
-## Running in dev mode
+### Running in dev mode
 
 ```sh
-wails3 dev -config ./build/config.yml
+make dev        # or: wails3 dev -config ./build/config.yml
 ```
 
-This will:
-1. Install frontend dependencies (`npm --prefix frontend install`, once).
-2. Start the Vite dev server in the background on `127.0.0.1:9245`.
-3. Build and launch the Go binary, which loads the webview pointed at the
-   Vite dev server for hot reload on both the Go and React sides.
+1. Installs frontend dependencies (`npm --prefix frontend install`, once)
+2. Starts the Vite dev server on `127.0.0.1:9245`
+3. Builds and launches the Go binary, which loads the webview pointed
+   at the dev server — hot reload on both sides
 
-Editing Go files triggers a rebuild + relaunch; editing frontend files
-hot-reloads via Vite.
-
-You can also run the frontend alone in a regular browser (no Go, no Wails)
-against the mock backend:
+Frontend alone in a browser (no Go, mock backend):
 
 ```sh
-cd frontend
-npm install
-npm run dev
+cd frontend && npm install && npm run dev
 ```
 
-## Make targets
+### Useful commands
 
 ```sh
 make help     # list everything
-make dev      # wails3 dev -config ./build/config.yml (hot reload, both sides)
-make lint     # golangci-lint run ./... (config: .golangci.yml)
+make dev      # wails3 dev (hot reload)
+make lint     # golangci-lint run ./...
 make lint-fix # auto-fix what the linters can
 make fmt      # apply the golangci-lint formatters
 make mocks    # regenerate gomock mocks after interface changes
 make test     # go test -race ./...
 ```
 
-## Building
+### Testing
+
+Table-driven, parallel, and asserted via `require` + gomock generated
+mocks (see CLAUDE.md rule 7). The gdrive provider runs against a fake
+Drive API over `httptest`; the S3 provider against a fake S3 XML
+server — no network or real credentials needed.
+
+```sh
+go test ./...                 # whole suite
+go test -race ./internal/... # with the race detector
+```
+
+### Building
 
 ```sh
 wails3 build
 ```
 
 Produces a native macOS binary in `bin/`.
-
-## Testing
-
-The Go test suite is table-driven, runs in parallel, and asserts via
-`stretchr/testify` `require` plus `go.uber.org/mock` generated mocks (see
-CLAUDE.md rule 7; regenerate after interface changes with `make mocks`). The
-gdrive provider is tested against a fake Drive API served by `httptest`, so
-no network or real credentials are needed:
-
-```sh
-go test ./...                # whole suite
-go test -race ./internal/... # with the race detector
-```
-
-Live behaviour (OAuth, real Drive traffic) is verified manually with
-`wails3 dev` and a real Google account.
