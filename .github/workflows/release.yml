@@ -1,0 +1,123 @@
+name: Release
+
+on:
+  push:
+    branches: [master]
+    tags:
+      - 'v*.*.*'
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Semver tag: build → sign → dmg → release → update Homebrew tap ──
+  release:
+    name: Build & Package
+    # Run for either master pushes (nightly) or semver tags (stable).
+    runs-on: macos-15
+    permissions:
+      contents: write    # needed to create releases and upload assets
+    env:
+      TAP_REPO: radekska/homebrew-airdrive
+      TAP_CASK_FILE: Casks/airdrive.rb
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.26
+
+      - name: Build frontend assets
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Build Wails app (macOS)
+        run: |
+          wails3 build -config ./build/config.yml
+
+      # Ad-hoc code signing is enough for a custom Homebrew tap.
+      # Users bypass Gatekeeper once via right-click → Open (documented in README).
+      - name: Ad-hoc sign the app bundle
+        run: |
+          codesign --force --deep --sign - "./bin/AirDrive.app"
+
+      - name: Create DMG
+        run: |
+          create-dmg \
+            --volname "AirDrive" \
+            --window-pos 200 120 \
+            --window-size 800 400 \
+            --icon-size 100 \
+            --icon "AirDrive.app" 200 190 \
+            --hide-extension "AirDrive.app" \
+            --app-drop-link 600 185 \
+            "dist/AirDrive.dmg" \
+            "./bin/AirDrive.app"
+        env:
+          CI: 'true'
+
+      - name: Compute SHA-256
+        id: sha
+        run: echo "shasum=$(shasum -a 256 dist/AirDrive.dmg | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      # ── Branch: semver tag → GitHub Release + update Homebrew tap ──
+      - name: Upload Release Asset
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v3
+        with:
+          files: dist/AirDrive.dmg
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+          make_latest: "true"
+
+      # Updating the tap repo requires a PAT whose `public_repo` scope can
+      # also write to radekska/homebrew-airdrive.  GITHUB_TOKEN cannot.
+      # Create fine-grained PAT at https://github.com/settings/tokens
+      # with access to both repos and store as HOMEBREW_TAP_PAT secret.
+      - name: Update Homebrew tap (cask version + SHA)
+        if: ${{ github.ref_type == 'tag' && secrets.HOMEBREW_TAP_PAT != '' }}
+        run: |
+          VERSION="${{ github.ref_name }}"
+          # Strip the 'v' prefix for the Homebrew version stanza.
+          VERSION="${VERSION#v}"
+
+          git clone "https://x-access-token:${{ secrets.HOMEBREW_TAP_PAT }}@github.com/${{ env.TAP_REPO }}" tap
+          cd tap
+
+          # Patch the version stanza in the Cask.
+          sed -i '' "s|version \".*\"|version \"${VERSION}\"|" "${TAP_CASK_FILE}"
+          # Patch the sha256 stanza.
+          sed -i '' "s|sha256 \".*\"|sha256 \"${{ steps.sha.outputs.shasum }}\"|" "${TAP_CASK_FILE}"
+
+          git add "${TAP_CASK_FILE}"
+          git diff --cached --quiet && exit 0   # nothing to commit
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "airdrive ${VERSION}"
+          git push
+
+      # ── Branch: master push → nightly pre-release ──
+      - name: Publish Nightly Pre-release
+        if: github.ref_type != 'tag'
+        uses: softprops/action-gh-release@v3
+        with:
+          files: dist/AirDrive.dmg
+          tag_name: nightly
+          name: Nightly build
+          prerelease: true
+          generate_release_notes: false
+          make_latest: "false"

@@ -9,6 +9,33 @@ Built with Wails v3 (Go backend + React/TypeScript webview), with a local
 SQLite index as the read path and migration-grade transfers that move files
 between providers with MD5 verification.
 
+[![CI](https://github.com/radekska/airdrive/actions/workflows/ci.yml/badge.svg)](https://github.com/radekska/airdrive/actions/workflows/ci.yml)
+[![Release](https://github.com/radekska/airdrive/actions/workflows/release.yml/badge.svg)](https://github.com/radekska/airdrive/actions/workflows/release.yml)
+
+## 📥 Installation
+
+**Direct download** — grab the latest `.dmg` from the [Releases](https://github.com/radekska/airdrive/releases) page.
+
+**Homebrew** — add the tap, then install the cask:
+
+```sh
+brew tap radekska/airdrive
+brew install --cask airdrive
+```
+
+On first launch macOS may warn that the app is from an unidentified developer.
+This is expected (the app is ad-hoc signed, not notarized). To proceed:
+
+1. Drag `AirDrive.app` to `/Applications`.
+2. Right-click the app in Finder and choose **Open**.
+3. Click **Open** again in the Gatekeeper dialog.
+
+Or, from the terminal:
+
+```sh
+xattr -d com.apple.quarantine /Applications/AirDrive.app
+```
+
 ## 📑 Table of Contents
 
 - [Features](#features)
