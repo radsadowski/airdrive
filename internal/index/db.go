@@ -35,8 +35,39 @@ type DB struct {
 }
 
 // Open creates (or opens) the database at path, runs pending migrations, and
-// enables WAL mode for concurrent reads.
+// enables WAL mode for concurrent reads. The index is disposable: when a
+// preexisting database's schema predates what the current build queries
+// (a migration edited in place during development), Open drops the file and
+// rebuilds it — the lost entries are repopulated by the next crawl.
 func Open(path string, logger *slog.Logger) (*DB, error) {
+	if logger == nil {
+		logger = slog.Default()
+	}
+
+	db, err := openMigrated(path)
+	if err != nil {
+		return nil, err
+	}
+	if _, probeErr := db.Exec("SELECT md5 FROM files LIMIT 0"); probeErr != nil {
+		logger.Warn("index: schema drift detected, rebuilding index", "path", path)
+		_ = db.Close()
+		for _, suffix := range []string{"", "-wal", "-shm"} {
+			if rmErr := os.Remove(path + suffix); rmErr != nil && !os.IsNotExist(rmErr) {
+				logger.Warn("index: drop stale database", "path", path+suffix, "err", rmErr)
+			}
+		}
+		db, err = openMigrated(path)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &DB{db: db, logger: logger}, nil
+}
+
+// openMigrated opens the SQLite database at path and applies pending
+// migrations with a single-writer connection.
+func openMigrated(path string) (*sql.DB, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return nil, fmt.Errorf("index: mkdir: %w", err)
 	}
@@ -59,10 +90,7 @@ func Open(path string, logger *slog.Logger) (*DB, error) {
 		return nil, fmt.Errorf("index: migrate: %w", err)
 	}
 
-	if logger == nil {
-		logger = slog.Default()
-	}
-	return &DB{db: db, logger: logger}, nil
+	return db, nil
 }
 
 // Close closes the underlying database.

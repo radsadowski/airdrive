@@ -2,6 +2,7 @@ package index
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -225,6 +226,50 @@ func TestWhenAFileWithAnMD5IsStoredThenItRoundTrips(t *testing.T) {
 	got, err := db.FileByID(ctx, "L1", "F1")
 	r.NoError(err)
 	r.Equal("d41d8cd98f00b204e9800998ecf8427e", got.MD5)
+}
+
+func TestWhenTheDatabasePredatesTheMD5ColumnThenOpenRebuildsIt(t *testing.T) {
+	t.Parallel()
+	r := require.New(t)
+	path := filepath.Join(t.TempDir(), "test.db")
+
+	legacy, err := sql.Open("sqlite", path)
+	r.NoError(err)
+	_, err = legacy.Exec(`
+		CREATE TABLE goose_db_version (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			version_id INTEGER NOT NULL,
+			is_applied INTEGER NOT NULL,
+			tstamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		);
+		INSERT INTO goose_db_version (version_id, is_applied) VALUES (1, 1);
+		CREATE TABLE locations (
+			id TEXT PRIMARY KEY, kind TEXT NOT NULL, name TEXT NOT NULL,
+			root TEXT NOT NULL, config TEXT NOT NULL DEFAULT '{}',
+			created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+		);
+		CREATE TABLE files (
+			id TEXT NOT NULL, location_id TEXT NOT NULL, parent_id TEXT NOT NULL DEFAULT '',
+			name TEXT NOT NULL, kind TEXT NOT NULL, size INTEGER NOT NULL DEFAULT 0,
+			mime TEXT NOT NULL DEFAULT '', etag TEXT NOT NULL DEFAULT '',
+			preview_kind TEXT NOT NULL DEFAULT '', modified_at TEXT NOT NULL,
+			indexed_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+			PRIMARY KEY (location_id, id)
+		);
+	`)
+	r.NoError(err)
+	r.NoError(legacy.Close())
+
+	db, err := Open(path, nil)
+	r.NoError(err)
+	t.Cleanup(func() { db.Close() })
+
+	seedLocation(t, db, "L1", "{}")
+	err = db.UpsertFile(context.Background(), provider.FileInfo{
+		ID: "F1", LocationID: "L1", Name: "a.png",
+		Kind: provider.FileKindFile, MD5: "d41d8cd98f00b204e9800998ecf8427e",
+	})
+	r.NoError(err, "files.md5 must exist after Open rebuilds a legacy database")
 }
 
 func TestWhenATransferBatchIsCreatedThenJobsPersistWithIt(t *testing.T) {
