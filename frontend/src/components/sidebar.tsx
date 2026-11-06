@@ -148,8 +148,12 @@ function LocationRow({ loc, collapsed }: { loc: Location; collapsed: boolean }) 
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[12.5px] font-medium leading-tight">{loc.name}</span>
         <span className="mt-0.5 block truncate font-mono text-[10.5px] leading-tight text-ink-faint">
-          {crawl
-            ? `${(crawl.done / 1000).toFixed(1)}k / ${(crawl.total / 1000).toFixed(1)}k indexed`
+          {loc.status === 'indexing' || loc.status === 'syncing'
+            ? crawl
+              ? crawl.total > 0
+                ? `${(crawl.done / 1000).toFixed(1)}k / ${(crawl.total / 1000).toFixed(1)}k indexed`
+                : `${crawl.done.toLocaleString()} files found…`
+              : 'Indexing…'
             : `${loc.fileCount.toLocaleString()} files · ${formatBytes(loc.totalSize)}`}
         </span>
       </span>
@@ -168,8 +172,11 @@ function LocationRow({ loc, collapsed }: { loc: Location; collapsed: boolean }) 
       {crawl && (
         <span className="absolute inset-x-2.5 bottom-0.5 h-[2px] overflow-hidden rounded-full bg-white/10">
           <span
-            className="block h-full rounded-full bg-amber transition-[width] duration-200"
-            style={{ width: `${(crawl.done / Math.max(1, crawl.total)) * 100}%` }}
+            className={cn(
+              'block h-full rounded-full bg-amber transition-[width] duration-200',
+              crawl.total <= 0 && 'w-2/5 animate-indeterminate',
+            )}
+            style={crawl.total > 0 ? { width: `${(crawl.done / crawl.total) * 100}%` } : undefined}
           />
         </span>
       )}

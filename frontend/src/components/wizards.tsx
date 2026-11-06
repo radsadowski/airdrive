@@ -59,6 +59,61 @@ function Picker({ onPick }: { onPick: (k: ProviderKind) => void }) {
   )
 }
 
+/* ------------------------- sync progress ------------------------- */
+
+/* waitForIdle resolves once the location's crawl reports the idle status. */
+function waitForIdle(locId: string): Promise<void> {
+  const isIdle = () =>
+    useAppStore.getState().locations.find((l) => l.id === locId)?.status === 'idle'
+  if (isIdle()) return Promise.resolve()
+  return new Promise((resolve) => {
+    const unsub = useAppStore.subscribe(() => {
+      if (isIdle()) {
+        unsub()
+        resolve()
+      }
+    })
+  })
+}
+
+/* SyncProgress shows what the initial crawl is doing after a location is
+ * added: a live file counter and a determinate bar when the total is known,
+ * a sweeping bar otherwise. */
+function SyncProgress({ locId, name }: { locId: string; name: string }) {
+  const loc = useAppStore((s) => s.locations.find((l) => l.id === locId))
+  const crawl = useAppStore((s) => s.crawlProgress[locId])
+
+  const pct = crawl && crawl.total > 0 ? Math.min(100, (crawl.done / crawl.total) * 100) : null
+
+  return (
+    <div className="rounded-[9px] border border-hairline bg-white/[0.02] p-3.5 animate-rise">
+      <div className="flex items-center gap-2">
+        <Loader2 size={13} className="animate-spin-slow shrink-0 text-amber" />
+        <div className="min-w-0 flex-1 truncate text-[12.5px] text-ink">
+          {loc?.status === 'error' ? 'Failed to index' : 'Syncing'} “{name}”
+        </div>
+      </div>
+      {loc?.status === 'error' ? (
+        <div className="mt-2 text-[12px] text-danger">{loc.error}</div>
+      ) : (
+        <>
+          <div className="mt-3 h-1 overflow-hidden rounded-full bg-white/[0.07]">
+            <div
+              className={cn('h-full rounded-full bg-amber', pct === null ? 'w-2/5 animate-indeterminate' : 'transition-[width] duration-200')}
+              style={pct !== null ? { width: `${pct}%` } : undefined}
+            />
+          </div>
+          <div className="mt-2 font-mono text-[10.5px] text-ink-faint">
+            {crawl
+              ? `${crawl.done.toLocaleString()} files found${crawl.total > 0 ? ` of ${crawl.total.toLocaleString()}` : '…'}`
+              : 'Connecting…'}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 /* ----------------------------- local ----------------------------- */
 
 function LocalWizard() {
@@ -66,9 +121,18 @@ function LocalWizard() {
   const [name, setName] = useState('')
   const [busy, setBusy] = useState(false)
   const [picking, setPicking] = useState(false)
+  const [syncing, setSyncing] = useState<{ id: string; name: string } | null>(null)
   const openWizard = useUiStore((s) => s.openWizard)
   const selectLocation = useAppStore((s) => s.selectLocation)
   const inputRef = useRef<HTMLInputElement>(null)
+  const finish = () => {
+    openWizard(null)
+    void selectLocation(syncing!.id)
+  }
+  const track = (id: string, name: string) => {
+    setSyncing({ id, name })
+    void waitForIdle(id).then(finish)
+  }
 
   const browse = async () => {
     setPicking(true)
@@ -92,12 +156,13 @@ function LocalWizard() {
     setBusy(true)
     try {
       const loc = await api.addLocalLocation({ root: path.trim(), name: name.trim() || undefined })
-      openWizard(null)
-      await selectLocation(loc.id)
+      track(loc.id, loc.name)
     } finally {
       setBusy(false)
     }
   }
+
+  if (syncing) return <div className="space-y-4 p-5 pt-1"><SyncProgress locId={syncing.id} name={syncing.name} /></div>
 
   return (
     <div className="space-y-4 p-5 pt-1">
@@ -178,6 +243,15 @@ function GoogleWizard() {
   }, [attempt])
 
   const current = path[path.length - 1]
+  const [syncing, setSyncing] = useState<{ id: string; name: string } | null>(null)
+  const finish = () => {
+    openWizard(null)
+    void selectLocation(syncing!.id)
+  }
+  const track = (id: string, name: string) => {
+    setSyncing({ id, name })
+    void waitForIdle(id).then(finish)
+  }
 
   useEffect(() => {
     if (!session) return
@@ -210,8 +284,7 @@ function GoogleWizard() {
     setBusy(true)
     try {
       const loc = await api.confirmGdriveLocation(session.sessionId, current.id)
-      openWizard(null)
-      await selectLocation(loc.id)
+      track(loc.id, current.name)
     } catch (e) {
       if (expired(e)) {
         restart()
@@ -254,6 +327,10 @@ function GoogleWizard() {
 
   return (
     <div className="space-y-3 p-5 pt-1">
+      {syncing ? (
+        <SyncProgress locId={syncing.id} name={syncing.name} />
+      ) : (
+      <>
       <div className="flex items-center justify-between text-[11.5px] text-ink-faint">
         <span>Signed in as <span className="text-ink-mut">{session.email}</span></span>
         <button className="hover:text-ink-mut" onClick={restart}>Switch account</button>
@@ -340,6 +417,8 @@ function GoogleWizard() {
           {path.length === 1 ? 'Sync all of My Drive' : `Sync “${current.name}”`}
         </Button>
       </div>
+      </>
+      )}
     </div>
   )
 }
@@ -364,8 +443,17 @@ function S3Wizard() {
   const [testResult, setTestResult] = useState<{ ok: boolean; buckets: string[]; error?: string } | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [syncing, setSyncing] = useState<{ id: string; name: string } | null>(null)
   const openWizard = useUiStore((s) => s.openWizard)
   const selectLocation = useAppStore((s) => s.selectLocation)
+  const finish = () => {
+    openWizard(null)
+    void selectLocation(syncing!.id)
+  }
+  const track = (id: string, name: string) => {
+    setSyncing({ id, name })
+    void waitForIdle(id).then(finish)
+  }
 
   const cfg = (): S3LocationConfig => ({
     preset,
@@ -400,8 +488,7 @@ function S3Wizard() {
     setError(null)
     try {
       const loc = await api.addS3Location(cfg())
-      openWizard(null)
-      await selectLocation(loc.id)
+      track(loc.id, loc.name)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -413,6 +500,10 @@ function S3Wizard() {
 
   return (
     <div className="space-y-4 p-5 pt-1">
+      {syncing ? (
+        <SyncProgress locId={syncing.id} name={syncing.name} />
+      ) : (
+      <>
       <div className="grid grid-cols-2 gap-1.5">
         {PRESETS.map((p) => (
           <button
@@ -484,6 +575,8 @@ function S3Wizard() {
         <div className="text-center font-mono text-[10px] text-ink-faint">
           mock: any endpoint + any keys pass the test · use dev panel to inject failures
         </div>
+      )}
+      </>
       )}
     </div>
   )
