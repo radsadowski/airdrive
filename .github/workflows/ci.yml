@@ -17,6 +17,13 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      # go vet/test only need any file under frontend/dist for the
+      # //go:embed pattern to resolve; the real assets are built in release.yml.
+      - name: Stub frontend/dist
+        run: |
+          mkdir -p frontend/dist
+          echo '<html><body>ci-stub</body></html>' > frontend/dist/index.html
+
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
@@ -35,6 +42,11 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v6
+
+      - name: Stub frontend/dist
+        run: |
+          mkdir -p frontend/dist
+          echo '<html><body>ci-stub</body></html>' > frontend/dist/index.html
 
       - uses: actions/setup-go@v6
         with:
