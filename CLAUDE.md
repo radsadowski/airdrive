@@ -242,9 +242,12 @@ app.Event.Emit(ev.FsChanged, payload)
 
 ## 6. Keep `README.md` in sync
 
-Whenever a change affects what's in the README — new/changed requirements,
-dev/build commands, tech stack, or overall project description/status —
+Whenever a change affects what's in the README: new/changed requirements,
+dev/build commands, tech stack, or overall project description/status,
 **update `README.md` in the same change**. Don't let it drift out of date.
+
+The em dash character (`—`) is forbidden in README.md. Use a colon, comma,
+or period instead.
 
 ## 7. Tests: parallel by default, assert with testify `require`
 
