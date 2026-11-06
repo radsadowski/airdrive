@@ -29,10 +29,10 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      # golangci-lint must match the version in the Makefile / .golangci.yml.
-      # Installed via brew for consistency with local dev (brew install golangci-lint).
+      # Pinned to the version local dev uses; brew latest is a newer major
+      # whose goconst/exclusions schema does not match .golangci.yml.
       - name: Install golangci-lint
-        run: brew install golangci-lint
+        run: curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b "$(go env GOPATH)/bin" v2.11.4
 
       - name: golangci-lint
         run: golangci-lint run ./...
