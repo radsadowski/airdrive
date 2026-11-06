@@ -21,6 +21,7 @@ jobs:
     env:
       TAP_REPO: radsadowski/homebrew-airdrive
       TAP_CASK_FILE: Casks/airdrive.rb
+      HOMEBREW_TAP_PAT: ${{ secrets.HOMEBREW_TAP_PAT }}
     steps:
       - uses: actions/checkout@v6
 
@@ -87,8 +88,9 @@ jobs:
       # also write to radsadowski/homebrew-airdrive.  GITHUB_TOKEN cannot.
       # Create fine-grained PAT at https://github.com/settings/tokens
       # with access to both repos and store as HOMEBREW_TAP_PAT secret.
+      # Skipped when the secret is unset (env.HOMEBREW_TAP_PAT is empty).
       - name: Update Homebrew tap (cask version + SHA)
-        if: ${{ github.ref_type == 'tag' && secrets.HOMEBREW_TAP_PAT != '' }}
+        if: ${{ github.ref_type == 'tag' && env.HOMEBREW_TAP_PAT != '' }}
         run: |
           VERSION="${{ github.ref_name }}"
           # Strip the 'v' prefix for the Homebrew version stanza.
