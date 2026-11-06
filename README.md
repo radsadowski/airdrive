@@ -9,17 +9,17 @@ Built with Wails v3 (Go backend + React/TypeScript webview), with a local
 SQLite index as the read path and migration-grade transfers that move files
 between providers with MD5 verification.
 
-[![CI](https://github.com/radekska/airdrive/actions/workflows/ci.yml/badge.svg)](https://github.com/radekska/airdrive/actions/workflows/ci.yml)
-[![Release](https://github.com/radekska/airdrive/actions/workflows/release.yml/badge.svg)](https://github.com/radekska/airdrive/actions/workflows/release.yml)
+[![CI](https://github.com/radsadowski/airdrive/actions/workflows/ci.yml/badge.svg)](https://github.com/radsadowski/airdrive/actions/workflows/ci.yml)
+[![Release](https://github.com/radsadowski/airdrive/actions/workflows/release.yml/badge.svg)](https://github.com/radsadowski/airdrive/actions/workflows/release.yml)
 
 ## 📥 Installation
 
-**Direct download** — grab the latest `.dmg` from the [Releases](https://github.com/radekska/airdrive/releases) page.
+**Direct download** — grab the latest `.dmg` from the [Releases](https://github.com/radsadowski/airdrive/releases) page.
 
 **Homebrew** — add the tap, then install the cask:
 
 ```sh
-brew tap radekska/airdrive
+brew tap radsadowski/airdrive
 brew install --cask airdrive
 ```
 

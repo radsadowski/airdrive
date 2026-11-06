@@ -19,7 +19,7 @@ jobs:
     permissions:
       contents: write    # needed to create releases and upload assets
     env:
-      TAP_REPO: radekska/homebrew-airdrive
+      TAP_REPO: radsadowski/homebrew-airdrive
       TAP_CASK_FILE: Casks/airdrive.rb
     steps:
       - uses: actions/checkout@v6
@@ -84,7 +84,7 @@ jobs:
           make_latest: "true"
 
       # Updating the tap repo requires a PAT whose `public_repo` scope can
-      # also write to radekska/homebrew-airdrive.  GITHUB_TOKEN cannot.
+      # also write to radsadowski/homebrew-airdrive.  GITHUB_TOKEN cannot.
       # Create fine-grained PAT at https://github.com/settings/tokens
       # with access to both repos and store as HOMEBREW_TAP_PAT secret.
       - name: Update Homebrew tap (cask version + SHA)
