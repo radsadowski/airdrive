@@ -37,7 +37,18 @@ func (p *Provider) Thumbnail(ctx context.Context, locationID, fileID string, siz
 	}
 	defer os.Remove(name)
 
-	cmd := exec.CommandContext(ctx, "sips", "-Z", strconv.Itoa(size), "-s", "format", "jpeg", path, "--out", name) //nolint:gosec // path is abs()-sandboxed under the location root; size comes from the bridge's allowlist
+	cmd := exec.CommandContext( //nolint:gosec // path is abs()-sandboxed under the location root; size comes from the bridge's allowlist
+		ctx,
+		"sips",
+		"-Z",
+		strconv.Itoa(size),
+		"-s",
+		"format",
+		"jpeg",
+		path,
+		"--out",
+		name,
+	)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return nil, fmt.Errorf("localfs: sips: %w: %s", err, strings.TrimSpace(string(out)))
 	}

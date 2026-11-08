@@ -8,9 +8,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/radosny/airdrive/internal/provider"
-
 	"google.golang.org/api/option"
+
+	"github.com/radosny/airdrive/internal/provider"
 )
 
 func TestWhenAThumbnailIsRequestedThenItIsFetchedAuthenticated(t *testing.T) {

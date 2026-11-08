@@ -57,4 +57,3 @@ func sizedThumbLink(link string, size int) string {
 	}
 	return link[:i] + marker + strconv.Itoa(size)
 }
-

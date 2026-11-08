@@ -468,7 +468,8 @@ func (d *DB) Search(ctx context.Context, q SearchQuery) (provider.ListPage, erro
 		whereSQL = "WHERE " + strings.Join(where, " AND ")
 	}
 
-	query := "SELECT f.id,f.location_id,f.parent_id,f.name,f.kind,f.size,f.mime,f.etag,f.md5,f.preview_kind,f.modified_at" + //nolint:gosec // whereSQL is built from validated filters, never raw user input
+	query := "SELECT f.id,f.location_id,f.parent_id,f.name,f.kind,f.size," + //nolint:gosec // whereSQL is built from validated filters, never raw user input
+		"f.mime,f.etag,f.md5,f.preview_kind,f.modified_at" +
 		" FROM files f " + whereSQL +
 		" ORDER BY f.modified_at DESC" +
 		" LIMIT ? OFFSET ?"

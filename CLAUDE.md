@@ -320,3 +320,24 @@ func crawl(id string) {
 	db.SetSyncCursor(ctx, id, newCursor)
 }
 ```
+
+## 9. Never push while local checks fail
+
+Before every `git push`, the full local gate must pass, matching CI
+exactly:
+
+```sh
+go build ./...            # compile everywhere, incl. generated mocks
+go vet ./...
+golangci-lint run ./...   # same version as CI (pinned in ci.yml), no drift
+go test ./... -count=1    # full suite, no cached passes
+cd frontend && npm run build && npx oxlint src/
+```
+
+If any step fails, fix it locally and only then push. Red-on-remote is
+never acceptable as a discovery mechanism: CI reruns cost minutes and
+fail releases half-built (a lint-red master can still mint releases,
+but the tag's CI run stays red).
+
+`git push` without this gate requires an explicit user override in the
+same message ("push without checks").
