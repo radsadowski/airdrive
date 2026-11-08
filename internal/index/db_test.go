@@ -370,3 +370,40 @@ func TestWhenInterruptedTransfersAreFailedThenRunningAndPausedFlip(t *testing.T)
 		}
 	}
 }
+
+func TestWhenSearchMatchesThenTheRowScansWithItsMD5(t *testing.T) {
+	t.Parallel()
+	r := require.New(t)
+	db := openTestDB(t)
+	ctx := context.Background()
+	seedLocation(t, db, "L1", "{}")
+	err := db.UpsertFile(ctx, provider.FileInfo{
+		ID:         "F1",
+		LocationID: "L1",
+		Name:       "IMG_2075.jpg",
+		Kind:       provider.FileKindFile,
+		MIME:       "image/jpeg",
+		Size:       42,
+		MD5:        "md5-f1",
+	})
+	r.NoError(err)
+
+	page, err := db.Search(ctx, SearchQuery{Text: "IMG_", LocationIDs: []string{"L1"}})
+	r.NoError(err, "a matching row must scan: regression for 'expected 10 destination arguments in Scan, not 11'")
+	r.Len(page.Items, 1)
+	r.Equal("F1", page.Items[0].ID)
+	r.Equal("md5-f1", page.Items[0].MD5, "Search must return the md5 column every other file query returns")
+}
+
+func TestWhenSearchFiltersOutEverythingThenAnEmptyPageReturns(t *testing.T) {
+	t.Parallel()
+	r := require.New(t)
+	db := openTestDB(t)
+	ctx := context.Background()
+	seedLocation(t, db, "L1", "{}")
+	seedFile(t, db, "F1", "L1")
+
+	page, err := db.Search(ctx, SearchQuery{Text: "zz-nonexistent"})
+	r.NoError(err)
+	r.Empty(page.Items)
+}

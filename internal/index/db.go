@@ -393,6 +393,19 @@ func (d *DB) ListDir(ctx context.Context, locationID, parentID string, sort prov
 	return provider.ListPage{Items: items, Cursor: nextCursor}, nil
 }
 
+// ftsMatch quotes each search term as an FTS5 prefix term; raw user text
+// would let FTS5 operators (", -, AND/OR) behave as syntax and error out.
+func ftsMatch(text string) string {
+	var terms []string
+	for _, field := range strings.Fields(text) {
+		field = strings.Trim(field, `"`)
+		if field != "" {
+			terms = append(terms, `"`+field+`"*`)
+		}
+	}
+	return strings.Join(terms, " ")
+}
+
 // CountFiles returns the number of non-directory files in a location.
 func (d *DB) CountFiles(ctx context.Context, locationID string) (int64, int64, error) {
 	var count, totalSize int64
@@ -417,9 +430,9 @@ func (d *DB) Search(ctx context.Context, q SearchQuery) (provider.ListPage, erro
 	var where []string
 	var args []any
 
-	if q.Text != "" {
+	if match := ftsMatch(q.Text); match != "" {
 		where = append(where, "f.rowid IN (SELECT rowid FROM files_fts WHERE name MATCH ?)")
-		args = append(args, q.Text+"*")
+		args = append(args, match)
 	}
 	if len(q.LocationIDs) > 0 {
 		placeholders := strings.Repeat("?,", len(q.LocationIDs))
@@ -455,7 +468,7 @@ func (d *DB) Search(ctx context.Context, q SearchQuery) (provider.ListPage, erro
 		whereSQL = "WHERE " + strings.Join(where, " AND ")
 	}
 
-	query := "SELECT f.id,f.location_id,f.parent_id,f.name,f.kind,f.size,f.mime,f.etag,f.preview_kind,f.modified_at" + //nolint:gosec // whereSQL is built from validated filters, never raw user input
+	query := "SELECT f.id,f.location_id,f.parent_id,f.name,f.kind,f.size,f.mime,f.etag,f.md5,f.preview_kind,f.modified_at" + //nolint:gosec // whereSQL is built from validated filters, never raw user input
 		" FROM files f " + whereSQL +
 		" ORDER BY f.modified_at DESC" +
 		" LIMIT ? OFFSET ?"
