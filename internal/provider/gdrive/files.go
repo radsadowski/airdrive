@@ -36,7 +36,7 @@ func queryParent(id string) string {
 }
 
 // isGoogleNative reports whether a Drive MIME type has no binary content
-// (Docs, Sheets, Shortcuts, …) — listable but not downloadable in v1.
+// (Docs, Sheets, Shortcuts, …): listable but not downloadable in v1.
 func isGoogleNative(mime string) bool {
 	return mime != folderMIME && strings.HasPrefix(mime, googleNativePrefix)
 }
@@ -136,7 +136,7 @@ func (p *Provider) MoveWithin(ctx context.Context, locationID string, fileIDs []
 	return nil
 }
 
-// Delete moves files to Drive's own trash — never permanent.
+// Delete moves files to Drive's own trash: never permanent.
 func (p *Provider) Delete(ctx context.Context, locationID string, fileIDs []string) error {
 	for _, id := range fileIDs {
 		if _, err := p.svc.Files.Update(id, &drive.File{Trashed: true}).Context(ctx).Do(); err != nil {
@@ -152,10 +152,10 @@ func (p *Provider) Download(ctx context.Context, locationID, fileID string) (io.
 		return nil, provider.FileInfo{}, fmt.Errorf("gdrive: get %q: %w", fileID, err)
 	}
 	if f.MimeType == folderMIME {
-		return nil, provider.FileInfo{}, fmt.Errorf("gdrive: %q is a directory — not downloadable", f.Name)
+		return nil, provider.FileInfo{}, fmt.Errorf("gdrive: %q is a directory: not downloadable", f.Name)
 	}
 	if isGoogleNative(f.MimeType) {
-		return nil, provider.FileInfo{}, fmt.Errorf("gdrive: %q is a Google-native file (%s) — export-download is not supported in v1", f.Name, f.MimeType)
+		return nil, provider.FileInfo{}, fmt.Errorf("gdrive: %q is a Google-native file (%s): export-download is not supported in v1", f.Name, f.MimeType)
 	}
 	res, err := p.svc.Files.Get(fileID).Context(ctx).Download()
 	if err != nil {

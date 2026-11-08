@@ -214,7 +214,7 @@ export function SearchOverlay() {
         <div ref={listRef} className="max-h-[46vh] overflow-y-auto p-1.5">
           {query.trim().length === 0 ? (
             <div className="px-3 py-8 text-center text-[12.5px] text-ink-faint">
-              Type to search across <span className="text-ink-mut">{locations.length} storages</span> —
+              Type to search across <span className="text-ink-mut">{locations.length} storages</span>,
               filenames, filters by type & size.
             </div>
           ) : results.length === 0 && !searching ? (

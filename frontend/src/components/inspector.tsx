@@ -55,7 +55,7 @@ export function Inspector() {
         </div>
 
         <div className="rounded-[8px] border border-hairline bg-black/20 px-3 py-2">
-          <Field label="location">{loc?.name ?? '—'}</Field>
+          <Field label="location">{loc?.name ?? '-'}</Field>
           <Field label="modified">{formatDateTime(file.modifiedAt)}</Field>
           <Field label="mime">{file.mime}</Field>
           <Field label="md5">

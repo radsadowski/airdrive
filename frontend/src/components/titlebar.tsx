@@ -1,7 +1,7 @@
 import { useBackendVersion } from '@/lib/backend'
 
 /**
- * Full-width title bar band — the native traffic lights live in this row,
+ * Full-width title bar band: the native traffic lights live in this row,
  * above all app UI (matches the 38px invisible title bar in main.go).
  * Window title centered, backend version chip at the right.
  */
@@ -15,7 +15,7 @@ export function TitleBar() {
         title={
           presence === 'wails'
             ? 'backend: Wails v3 (Go service)'
-            : 'backend: browser mock — run under wails3 for the real loop'
+            : 'backend: browser mock: run under wails3 for the real loop'
         }
       >
         {version}

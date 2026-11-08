@@ -1,7 +1,7 @@
-/** Formatting helpers — the data cockpit's readouts. */
+/** Formatting helpers: the data cockpit's readouts. */
 
 export function formatBytes(bytes: number, digits = 1): string {
-  if (!Number.isFinite(bytes)) return '—'
+  if (!Number.isFinite(bytes)) return '-'
   if (bytes === 0) return '0 B'
   const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']
   const i = Math.min(Math.floor(Math.log2(bytes) / 10), units.length - 1)
@@ -28,7 +28,7 @@ const dateTimeFmt = new Intl.DateTimeFormat('en', {
 
 export function formatDate(iso: string): string {
   const d = new Date(iso)
-  return !Number.isFinite(d.getTime()) || d.getFullYear() < 2000 ? '—' : dateFmt.format(d)
+  return !Number.isFinite(d.getTime()) || d.getFullYear() < 2000 ? '-' : dateFmt.format(d)
 }
 
 export function formatDateTime(iso: string): string {

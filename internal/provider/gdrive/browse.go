@@ -15,14 +15,14 @@ import (
 	"github.com/radosny/airdrive/internal/provider"
 )
 
-// BrowseClient lists folders on an account before any location exists —
+// BrowseClient lists folders on an account before any location exists.
 // used by the connect wizard's folder picker.
 type BrowseClient interface {
 	// Folders returns the subfolders of dirID ("" = My Drive root).
 	Folders(ctx context.Context, dirID string) ([]provider.FileInfo, error)
 	// Folder returns one folder's metadata by ID.
 	Folder(ctx context.Context, fileID string) (provider.FileInfo, error)
-	// StarredFolders returns starred folders anywhere on the account — the
+	// StarredFolders returns starred folders anywhere on the account: the
 	// only API-visible path to Computers-section (Drive for desktop) folders.
 	StarredFolders(ctx context.Context) ([]provider.FileInfo, error)
 }

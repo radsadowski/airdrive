@@ -78,14 +78,14 @@ export function AppShell() {
         return
       }
 
-      // ⌘E — toggle sidebar
+      // ⌘E: toggle sidebar
       if (meta && e.key.toLowerCase() === 'e') {
         e.preventDefault()
         useUiStore.getState().toggleSidebar()
         return
       }
 
-      // ⌘[ / ⌘] — back / forward (before the input guard so they work everywhere)
+      // ⌘[ / ⌘]: back / forward (before the input guard so they work everywhere)
       if (meta && e.key === '[') {
         e.preventDefault()
         void useAppStore.getState().goBack()

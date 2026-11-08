@@ -38,7 +38,7 @@ type DB struct {
 // enables WAL mode for concurrent reads. The index is disposable: when a
 // preexisting database's schema predates what the current build queries
 // (a migration edited in place during development), Open drops the file and
-// rebuilds it — the lost entries are repopulated by the next crawl.
+// rebuilds it: the lost entries are repopulated by the next crawl.
 func Open(path string, logger *slog.Logger) (*DB, error) {
 	if logger == nil {
 		logger = slog.Default()
@@ -245,7 +245,7 @@ func (d *DB) locationConfig(ctx context.Context, locationID string) (map[string]
 }
 
 // DeleteFilesNotIn removes a location's files whose IDs are not in keep,
-// returning the number removed — the reconcile pass that detects remote
+// returning the number removed: the reconcile pass that detects remote
 // deletions for providers without a changes feed.
 func (d *DB) DeleteFilesNotIn(ctx context.Context, locationID string, keep []string) (int64, error) {
 	if _, err := d.db.ExecContext(ctx, `DROP TABLE IF EXISTS temp.keep_ids`); err != nil {
@@ -311,7 +311,7 @@ func (d *DB) DeleteFile(ctx context.Context, locationID, fileID string) error {
 	return err
 }
 
-// DeleteChildrenOf removes all files whose id starts with dirPath/ — used when
+// DeleteChildrenOf removes all files whose id starts with dirPath/: used when
 // a directory is deleted from the filesystem so descendants are purged too.
 func (d *DB) DeleteChildrenOf(ctx context.Context, locationID, dirPath string) error {
 	prefix := dirPath + "/"

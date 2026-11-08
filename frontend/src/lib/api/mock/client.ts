@@ -1,5 +1,5 @@
 /**
- * MockClient — a stateful in-memory implementation of the ApiClient contract.
+ * MockClient: a stateful in-memory implementation of the ApiClient contract.
  * The whole product runs against this in a plain browser. Operations mutate
  * the tree; transfers simulate; crawls emit progress; auth is theater.
  */
@@ -23,7 +23,7 @@ import { ApiError, MockState } from './state'
 import { TransferEngine, runFakeCrawl } from './runtime'
 
 /* ------------------------------------------------------------------ */
-/* Dev controls (exported for the dev panel — mock only)               */
+/* Dev controls (exported for the dev panel: mock only)               */
 /* ------------------------------------------------------------------ */
 
 export interface MockDevControls {
@@ -68,7 +68,7 @@ class MockClient implements ApiClient {
   /* ---- boot ---- */
 
   seed(): void {
-    // first run: a live cockpit — local Documents, Drive, one R2 bucket
+    // first run: a live cockpit: local Documents, Drive, one R2 bucket
     this.state.loadPreset(PRESETS[0], PRESETS[0].seed)
     this.state.loadPreset(PRESETS[2], PRESETS[2].seed)
     this.state.loadPreset(PRESETS[3], PRESETS[3].seed)
@@ -80,7 +80,7 @@ class MockClient implements ApiClient {
       throw new ApiError('injected', 'Request failed (injected via dev panel)', true)
     }
     if (this.engine.offline && kind !== 'localfs') {
-      throw new ApiError('offline', `${kind === 'gdrive' ? 'Google Drive' : 'S3'} is unreachable — you are offline`, true)
+      throw new ApiError('offline', `${kind === 'gdrive' ? 'Google Drive' : 'S3'} is unreachable: you are offline`, true)
     }
     const jitter = 0.7 + Math.random() * 0.6
     await sleep(baseMs * jitter * this.latencyMultiplier)
@@ -120,7 +120,7 @@ class MockClient implements ApiClient {
     await this.net('localfs', 180)
     const preset: (typeof PRESETS)[number] = {
       kind: 'localfs',
-      name: req.name ?? `Local — ${req.root.split('/').pop() || req.root}`,
+      name: req.name ?? `Local: ${req.root.split('/').pop() || req.root}`,
       root: req.root,
       seed: 3000 + Math.floor(Math.random() * 900),
       specs: [{ name: req.root.split('/').pop() || 'root', files: 40 + Math.floor(Math.random() * 120), subdirs: 3 }],
@@ -132,7 +132,7 @@ class MockClient implements ApiClient {
 
   async connectGdrive(): Promise<GdriveSession> {
     // Real sign-in is a single round trip through the system browser with no
-    // in-app account chooser — simulate that latency, then "pick" the first
+    // in-app account chooser: simulate that latency, then "pick" the first
     // fake account, mirroring FetchAccountInfo() on the real backend.
     await this.net('gdrive', 1400)
     const account = FAKE_ACCOUNTS[0]
@@ -144,7 +144,7 @@ class MockClient implements ApiClient {
   async browseGdriveFolders(sessionId: string, dirId: string | null): Promise<FileInfo[]> {
     await this.net('gdrive', 220)
     const account = this.gdriveSessions.get(sessionId)
-    if (!account) throw new ApiError('expired', 'google sign-in session expired — start again', true)
+    if (!account) throw new ApiError('expired', 'google sign-in session expired: start again', true)
     return DRIVE_FOLDERS.filter((f) => f.parentId === (dirId ?? 'root')).map((f) => ({
       id: f.id,
       locationId: '',
@@ -161,7 +161,7 @@ class MockClient implements ApiClient {
   async starredGdriveFolders(sessionId: string): Promise<FileInfo[]> {
     await this.net('gdrive', 220)
     const account = this.gdriveSessions.get(sessionId)
-    if (!account) throw new ApiError('expired', 'google sign-in session expired — start again', true)
+    if (!account) throw new ApiError('expired', 'google sign-in session expired: start again', true)
     return DRIVE_FOLDERS.filter((f) => f.starred).map((f) => ({
       id: f.id,
       locationId: '',
@@ -178,14 +178,14 @@ class MockClient implements ApiClient {
   async confirmGdriveLocation(sessionId: string, folderId: string | null): Promise<Location> {
     await this.net('gdrive', 600)
     const account = this.gdriveSessions.get(sessionId)
-    if (!account) throw new ApiError('expired', 'google sign-in session expired — start again', true)
+    if (!account) throw new ApiError('expired', 'google sign-in session expired: start again', true)
     this.gdriveSessions.delete(sessionId)
     const folder = folderId ? DRIVE_FOLDERS.find((f) => f.id === folderId) : null
     const preset = PRESETS[2]
     const loc = this.state.loadPreset(
       {
         ...preset,
-        name: folder ? `${account.name} · ${folder.name}` : `Google Drive — ${account.email}`,
+        name: folder ? `${account.name} · ${folder.name}` : `Google Drive: ${account.email}`,
         root: folder?.name ?? 'My Drive',
       },
       4400 + Math.floor(Math.random() * 99),
@@ -198,7 +198,7 @@ class MockClient implements ApiClient {
     await this.net('s3', 800)
     const preset: (typeof PRESETS)[number] = {
       kind: 's3',
-      name: `${cfg.preset.toUpperCase()} — ${cfg.bucket}`,
+      name: `${cfg.preset.toUpperCase()}: ${cfg.bucket}`,
       root: cfg.bucket,
       seed: 5000 + Math.floor(Math.random() * 900),
       specs: [{ name: cfg.bucket, files: 200 + Math.floor(Math.random() * 600), subdirs: 4 }],
@@ -211,7 +211,7 @@ class MockClient implements ApiClient {
   async testS3Connection(cfg: S3LocationConfig): Promise<{ ok: boolean; buckets: string[]; error?: string }> {
     await this.net('s3', 650)
     if (this.engine.offline) {
-      return { ok: false, buckets: [], error: 'endpoint unreachable — check network' }
+      return { ok: false, buckets: [], error: 'endpoint unreachable: check network' }
     }
     if (!cfg.endpoint.startsWith('http') || !cfg.accessKeyId) {
       return { ok: false, buckets: [], error: 'invalid endpoint or credentials' }
@@ -334,7 +334,7 @@ class MockClient implements ApiClient {
       return `${this.state.settings.downloadDir}/${n.name}`
     })
     const label = fileIds.length === 1 ? this.state.node(fileIds[0]).name : `${fileIds.length} files`
-    this.toast(`Saved to ~/Downloads`, `${label} — ${Math.round(Math.random() * 300 + 60)} MB/s average`, 'success', 'Reveal')
+    this.toast(`Saved to ~/Downloads`, `${label}: ${Math.round(Math.random() * 300 + 60)} MB/s average`, 'success', 'Reveal')
     return { targets }
   }
 
@@ -343,7 +343,7 @@ class MockClient implements ApiClient {
     await this.net(kind, 120)
     const rng = new Rng(Date.now() & 0xffff)
     const specs = files.map((f) => {
-      // placeholder node — invisible (trashed) until its transfer completes
+      // placeholder node: invisible (trashed) until its transfer completes
       const node = { ...makeFile(locationId, destDirId, f.name, rng, 'upload'), trashed: true }
       node.size = f.size
       this.state.files.set(node.id, node)

@@ -1,5 +1,5 @@
 /**
- * Client factory — the mock|wails switch.
+ * Client factory: the mock|wails switch.
  *
  * Inside a Wails webview runs `wailsClient`; a plain browser (e.g. `vite dev`)
  * runs the stateful mock. Detection must be synchronous: the client is picked

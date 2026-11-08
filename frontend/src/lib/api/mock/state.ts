@@ -1,5 +1,5 @@
 /**
- * MockState — the in-memory filesystem backing the MockClient.
+ * MockState: the in-memory filesystem backing the MockClient.
  * Every operation mutates this tree; rename renames, move moves, delete trashes.
  */
 

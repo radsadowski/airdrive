@@ -26,9 +26,9 @@ import { Badge } from '@/components/ui/badge'
 /* ----------------------------- picker ----------------------------- */
 
 const PROVIDERS: { kind: ProviderKind | 'trash'; title: string; desc: string; icon: typeof HardDrive; soon?: boolean }[] = [
-  { kind: 'localfs', title: 'Local folder', desc: 'Any folder on this Mac — indexed & watched', icon: HardDrive },
+  { kind: 'localfs', title: 'Local folder', desc: 'Any folder on this Mac: indexed & watched', icon: HardDrive },
   { kind: 'gdrive', title: 'Google Drive', desc: 'Sign in with Google · My Drive', icon: Cloud },
-  { kind: 's3', title: 'S3 compatible', desc: 'R2 · B2 · MinIO · AWS — any bucket', icon: Globe },
+  { kind: 's3', title: 'S3 compatible', desc: 'R2 · B2 · MinIO · AWS: any bucket', icon: Globe },
   { kind: 'trash', title: 'Dropbox / OneDrive', desc: 'Planned post-v1', icon: Globe, soon: true },
 ]
 
@@ -144,7 +144,7 @@ function LocalWizard() {
         inputRef.current?.focus()
       }
     } catch {
-      // running in browser mock — no native dialog available
+      // running in browser mock: no native dialog available
     } finally {
       setPicking(false)
     }
@@ -223,7 +223,7 @@ function GoogleWizard() {
 
   useEffect(() => {
     // connectGdrive() opens the system browser and starts a real loopback
-    // listener — it can't be cancelled once started, and must only run once
+    // listener: it can't be cancelled once started, and must only run once
     // per attempt. React StrictMode double-invokes effects in dev, so the
     // call is deduped via a ref keyed by `attempt`; every invocation attaches
     // its own .then()/.catch() to the same shared promise.
@@ -393,7 +393,7 @@ function GoogleWizard() {
             ) : (
               <div className="flex flex-col items-center gap-1 py-12 text-center">
                 <Folder size={16} className="text-ink-faint" />
-                <div className="text-[12px] text-ink-faint">No subfolders — sync this folder as-is</div>
+                <div className="text-[12px] text-ink-faint">No subfolders: sync this folder as-is</div>
               </div>
             )}
           </>
@@ -551,7 +551,7 @@ function S3Wizard() {
       )}
       {testResult?.ok && (
         <div className="rounded-[7px] border border-success/25 bg-success/10 px-3 py-2 text-[12px] text-success">
-          Connected — visible buckets: <span className="font-mono">{testResult.buckets.join(', ')}</span>
+          Connected: visible buckets: <span className="font-mono">{testResult.buckets.join(', ')}</span>
         </div>
       )}
       {error && (
@@ -593,7 +593,7 @@ export function Wizards() {
   const titles: Record<string, { title: string; sub: string }> = {
     picker: { title: 'Add a storage', sub: 'One AirDrive, every storage.' },
     local: { title: 'Add local folder', sub: 'Indexed locally, watched with fsnotify' },
-    drive: { title: 'Connect Google Drive', sub: 'OAuth in Testing mode — fine for personal use' },
+    drive: { title: 'Connect Google Drive', sub: 'OAuth in Testing mode: fine for personal use' },
     s3: { title: 'Connect S3-compatible storage', sub: 'The rendezvous for your machines' },
   }
   const t = titles[wizard]

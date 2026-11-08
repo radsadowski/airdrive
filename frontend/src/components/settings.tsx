@@ -59,7 +59,7 @@ export function SettingsDialog() {
           <div className="mb-1 mt-3 flex items-center gap-1.5 font-mono text-[9.5px] uppercase tracking-[0.14em] text-ink-faint">
             <Gauge size={10} /> transfers
           </div>
-          <Row label="Concurrent file transfers" hint="worker pool size — the engine picks this up live">
+          <Row label="Concurrent file transfers" hint="worker pool size: the engine picks this up live">
             <span className="font-mono text-[12px] tabular text-amber">{settings.concurrentTransfers}</span>
           </Row>
           <Row label="Bandwidth limit" hint="keeps the home network usable during migrations">

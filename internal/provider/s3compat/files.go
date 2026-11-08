@@ -14,7 +14,7 @@ import (
 	"github.com/radosny/airdrive/internal/provider"
 )
 
-// List returns the full directory — minio-go paginates internally, so the
+// List returns the full directory: minio-go paginates internally, so the
 // cursor is always empty (the index is the UI's read path).
 func (p *Provider) List(ctx context.Context, locationID, dirID string, sort provider.SortSpec, cursor string, limit int) (provider.ListPage, error) {
 	var items []provider.FileInfo
@@ -70,7 +70,7 @@ func (p *Provider) Rename(ctx context.Context, locationID, fileID, newName strin
 	return p.toFileInfo(newKey, 0, "", time.Now().UTC()), nil
 }
 
-// MoveWithin moves files and directory trees under destDirID — a server-side
+// MoveWithin moves files and directory trees under destDirID: a server-side
 // copy per object, then removal of the sources.
 func (p *Provider) MoveWithin(ctx context.Context, locationID string, fileIDs []string, destDirID string) error {
 	for _, id := range fileIDs {
@@ -91,7 +91,7 @@ func (p *Provider) MoveWithin(ctx context.Context, locationID string, fileIDs []
 	return nil
 }
 
-// Delete moves objects to the in-bucket trash prefix — never permanent.
+// Delete moves objects to the in-bucket trash prefix: never permanent.
 func (p *Provider) Delete(ctx context.Context, locationID string, fileIDs []string) error {
 	for _, id := range fileIDs {
 		ts := fmt.Sprintf("%d", time.Now().UnixNano())
@@ -152,7 +152,7 @@ func (p *Provider) remove(ctx context.Context, key string) error {
 }
 
 // movePrefix copies every object under oldPrefix to the equivalent key under
-// newPrefix, then removes the sources — S3 has no atomic prefix rename.
+// newPrefix, then removes the sources: S3 has no atomic prefix rename.
 func (p *Provider) movePrefix(ctx context.Context, oldPrefix, newPrefix string) error {
 	var keys []string
 	for obj := range p.client.ListObjects(ctx, p.bucket, minio.ListObjectsOptions{Prefix: oldPrefix, Recursive: true}) {

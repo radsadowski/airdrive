@@ -156,7 +156,7 @@ func (m *Manager) handle(path string, op fsnotify.Op) {
 		if err := m.db.DeleteChildrenOf(ctx, entry.locationID, path); err != nil {
 			m.logger.Warn("watcher: delete children from index", "path", path, "err", err)
 		}
-		// Remove watch — may fail if the path was already removed; expected race.
+		// Remove watch: may fail if the path was already removed; expected race.
 		if err := m.watcher.Remove(path); err != nil {
 			m.logger.Debug("watcher: remove watch (expected if path already gone)", "path", path, "err", err)
 		}
@@ -164,7 +164,7 @@ func (m *Manager) handle(path string, op fsnotify.Op) {
 	case op.Has(fsnotify.Create):
 		fi, err := os.Stat(path)
 		if err != nil {
-			// File removed between event and debounce firing — expected race.
+			// File removed between event and debounce firing: expected race.
 			m.logger.Debug("watcher: stat on create (file may have been removed)", "path", path, "err", err)
 			return
 		}

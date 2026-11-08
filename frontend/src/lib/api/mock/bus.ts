@@ -2,7 +2,7 @@ import type { AppEventMap, AppEventName } from '../contract'
 
 type Handler<K extends AppEventName> = (payload: AppEventMap[K]) => void
 
-/** In-memory event bus — same shape the Wails `Events.On` client implements. */
+/** In-memory event bus: same shape the Wails `Events.On` client implements. */
 export class MockEventBus {
   private handlers = new Map<AppEventName, Set<Handler<AppEventName>>>()
 

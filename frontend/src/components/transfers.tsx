@@ -138,7 +138,7 @@ function BatchRow({ batch }: { batch: BatchView }) {
                   : job.state === 'failed'
                     ? (job.error ?? 'failed')
                     : job.state === 'skipped'
-                      ? 'identical — skipped'
+                      ? 'identical: skipped'
                       : job.state === 'done'
                         ? `${formatBytes(job.bytesTotal)} · md5 ✓`
                         : formatBytes(job.bytesTotal)}

@@ -134,7 +134,7 @@ func (s *LocationService) ListLocations() ([]entities.Location, error) {
 // AddLocalLocation adds a local folder as a new location and starts a crawl.
 func (s *LocationService) AddLocalLocation(root, name string) (*entities.Location, error) {
 	if name == "" {
-		name = "Local — " + root
+		name = "Local: " + root
 	}
 	id := uuid.NewString()
 	loc := index.Location{
@@ -184,7 +184,7 @@ func (s *LocationService) RemoveLocation(locationID string) error {
 	s.registry.Unregister(locationID)
 	s.watcher.Unwatch(locationID)
 	if err := auth.DeleteToken(locationID); err != nil {
-		// Not fatal — the location row is the source of truth; a stray
+		// Not fatal: the location row is the source of truth; a stray
 		// Keychain item is harmless clutter, not a correctness bug.
 		s.logger.Warn("remove location: keychain cleanup", "id", locationID, "err", err)
 	}
@@ -193,7 +193,7 @@ func (s *LocationService) RemoveLocation(locationID string) error {
 
 // crawl syncs a provider into the index, emitting progress events. The
 // cursor persists only on success, so an interrupted full walk re-walks
-// from scratch — never a partial resume.
+// from scratch: never a partial resume.
 func (s *LocationService) crawl(locationID string, p provider.StorageProvider) {
 	s.emitLocationStatus(locationID, "indexing", "")
 	var done int64
@@ -356,7 +356,7 @@ func (s *LocationService) BrowseGdriveFolders(sessionID, dirID string) ([]entiti
 	return out, nil
 }
 
-// StarredGdriveFolders lists starred folders account-wide — the only
+// StarredGdriveFolders lists starred folders account-wide: the only
 // API-visible path to Computers-section (Drive for desktop) folders.
 func (s *LocationService) StarredGdriveFolders(sessionID string) ([]entities.File, error) {
 	sess, err := s.session(sessionID)
@@ -465,7 +465,7 @@ func (s *LocationService) session(sessionID string) (*gdriveSession, error) {
 		if ok {
 			delete(s.gdriveSessions, sessionID)
 		}
-		return nil, errors.New("google sign-in session expired — start again")
+		return nil, errors.New("google sign-in session expired: start again")
 	}
 	return sess, nil
 }
@@ -493,7 +493,7 @@ func (s *LocationService) TestS3Connection(cfg entities.S3Config) (*entities.S3T
 	if err != nil {
 		if cfg.Bucket != "" {
 			if exists, bErr := client.BucketExists(context.Background(), cfg.Bucket); bErr == nil && exists {
-				s.logger.Warn("s3 connection test: bucket listing denied but bucket readable — bucket-scoped token?",
+				s.logger.Warn("s3 connection test: bucket listing denied but bucket readable: bucket-scoped token?",
 					"endpoint", cfg.Endpoint, "bucket", cfg.Bucket, "listErr", s3compat.DescribeError(err))
 				return &entities.S3TestResult{OK: true, Buckets: []string{cfg.Bucket}}, nil
 			} else if bErr != nil {
@@ -531,7 +531,7 @@ func (s *LocationService) AddS3Location(cfg entities.S3Config) (*entities.Locati
 
 	name := cfg.Bucket
 	if cfg.Preset != "" {
-		name = strings.ToUpper(cfg.Preset) + " — " + cfg.Bucket
+		name = strings.ToUpper(cfg.Preset) + ": " + cfg.Bucket
 	}
 	loc := index.Location{ID: id, Kind: provider.KindS3, Name: name, Root: cfg.Bucket}
 	if err := s.db.UpsertLocation(ctx, loc); err != nil {
@@ -615,7 +615,7 @@ func (s *LocationService) Restore() error {
 		case provider.KindGDrive:
 			if _, lErr := s.loadToken(l.ID); lErr != nil {
 				s.logger.Warn("restore gdrive: credentials missing", "id", l.ID, "err", lErr)
-				s.emitLocationStatus(l.ID, "error", "Google account credentials are missing — remove and re-connect the location")
+				s.emitLocationStatus(l.ID, "error", "Google account credentials are missing: remove and re-connect the location")
 				continue
 			}
 			p, pErr := s.newGdriveProvider(ctx, l.ID, s.logger)
@@ -630,7 +630,7 @@ func (s *LocationService) Restore() error {
 		case provider.KindS3:
 			if _, cErr := s.loadCreds(l.ID); cErr != nil {
 				s.logger.Warn("restore s3: credentials missing", "id", l.ID, "err", cErr)
-				s.emitLocationStatus(l.ID, "error", "S3 credentials are missing — remove and re-connect the location")
+				s.emitLocationStatus(l.ID, "error", "S3 credentials are missing: remove and re-connect the location")
 				continue
 			}
 			s3p, s3Err := s.newS3Provider(ctx, l.ID, s.logger)

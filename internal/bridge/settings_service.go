@@ -1,4 +1,4 @@
-// SettingsService — persisted settings for the transfer engine and the
+// SettingsService: persisted settings for the transfer engine and the
 // settings panel. Atomic JSON writes to dataDir/settings.json.
 package bridge
 

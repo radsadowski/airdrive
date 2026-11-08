@@ -1,5 +1,5 @@
 /**
- * File operations — every mutation funnels through here so refresh + toast
+ * File operations: every mutation funnels through here so refresh + toast
  * behavior is consistent across context menu, keyboard, and drag-drop.
  */
 
@@ -75,7 +75,7 @@ export function copyOrCutSelection(mode: 'copy' | 'cut'): void {
   })
   useUiStore.getState().pushToast({
     title: mode === 'copy' ? 'Copied' : 'Cut',
-    description: `${s.selection.length} item${s.selection.length > 1 ? 's' : ''} — paste with ⌘V`,
+    description: `${s.selection.length} item${s.selection.length > 1 ? 's' : ''}: paste with ⌘V`,
   })
 }
 

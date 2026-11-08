@@ -4,7 +4,7 @@
   --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', monospace;
 
-  /* cockpit palette — near-black with blue undertone, amber instrumentation */
+  /* cockpit palette: near-black with blue undertone, amber instrumentation */
   --color-base: #0b0c0f;
   --color-panel: #121316;
   --color-elevated: #17181d;
@@ -67,7 +67,7 @@
 }
 
 /* ------------------------------------------------------------------ */
-/* Light theme — overrides every color token; all components flip for  */
+/* Light theme: overrides every color token; all components flip for  */
 /* free because they reference tokens, never raw hex.                  */
 /* ------------------------------------------------------------------ */
 [data-theme="light"] {

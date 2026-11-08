@@ -1,5 +1,5 @@
 /**
- * Fake-data engine — seeded, deterministic, realistic.
+ * Fake-data engine: seeded, deterministic, realistic.
  * Doubles as the fixture set for Vitest + Playwright later.
  */
 
@@ -224,7 +224,7 @@ export function genSubtree(
   const depth = spec.depth ?? 0
   let filesLeft = spec.files
 
-  // direct files — between 0% and 40% of budget at this level
+  // direct files: between 0% and 40% of budget at this level
   const direct = Math.min(filesLeft, rng.int(0, Math.ceil(spec.files * 0.4)))
   for (let i = 0; i < direct; i++) {
     out.push(makeFile(locationId, dir.id, genName(rng, spec.persona ?? 'personal'), rng, seedPath))
@@ -243,7 +243,7 @@ export function genSubtree(
       filesLeft -= budget
     }
   } else {
-    // depth exhausted — dump remaining as flat files
+    // depth exhausted: dump remaining as flat files
     for (let i = 0; i < filesLeft; i++) {
       out.push(makeFile(locationId, dir.id, genName(rng, spec.persona ?? 'personal'), rng, seedPath))
     }
@@ -266,7 +266,7 @@ export interface LocationPreset {
 export const PRESETS: LocationPreset[] = [
   {
     kind: 'localfs',
-    name: 'MacBook — Documents',
+    name: 'MacBook: Documents',
     root: '/Users/you/Documents',
     seed: 1101,
     specs: [
@@ -278,7 +278,7 @@ export const PRESETS: LocationPreset[] = [
   },
   {
     kind: 'localfs',
-    name: 'Studio — Media Drive',
+    name: 'Studio: Media Drive',
     root: '/Volumes/Studio',
     seed: 1102,
     specs: [
@@ -290,7 +290,7 @@ export const PRESETS: LocationPreset[] = [
   },
   {
     kind: 'gdrive',
-    name: 'Google Drive — you@gmail.com',
+    name: 'Google Drive: you@gmail.com',
     root: 'My Drive',
     seed: 2201,
     specs: [
@@ -299,7 +299,7 @@ export const PRESETS: LocationPreset[] = [
   },
   {
     kind: 's3',
-    name: 'R2 — airdrive-prod',
+    name: 'R2: airdrive-prod',
     root: 'airdrive-prod',
     seed: 3301,
     specs: [
@@ -308,7 +308,7 @@ export const PRESETS: LocationPreset[] = [
   },
   {
     kind: 's3',
-    name: 'R2 — backups-archive',
+    name: 'R2: backups-archive',
     root: 'backups-archive',
     seed: 3302,
     specs: [
@@ -319,7 +319,7 @@ export const PRESETS: LocationPreset[] = [
 
 export const STRESS_PRESET: LocationPreset = {
   kind: 'localfs',
-  name: 'Stress Test — 250k files',
+  name: 'Stress Test: 250k files',
   root: '/tmp/stress',
   seed: 9901,
   specs: [
@@ -335,7 +335,7 @@ const LOREM = [
   'AirDrive is the single cockpit for every storage you own.',
   'The index lives in SQLite; the journals make transfers resumable.',
   'Every byte streamed between providers is verified with MD5.',
-  'Nothing is unrecoverable by default — trash everywhere.',
+  'Nothing is unrecoverable by default: trash everywhere.',
   'Run the migration twice; the second pass is a no-op.',
   'R2 is the rendezvous. Machines never talk to each other.',
   'The crawl is resumable: kill it at file 400,000 of a million.',

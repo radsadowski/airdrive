@@ -151,7 +151,7 @@ export function TransferPicker() {
                 ))
             )}
             {dir && dir.items.filter((f) => f.kind === 'dir').length === 0 && !loading && (
-              <div className="px-3 py-2 text-[11.5px] text-ink-faint">no subfolders — drop here</div>
+              <div className="px-3 py-2 text-[11.5px] text-ink-faint">no subfolders: drop here</div>
             )}
           </div>
 
@@ -176,7 +176,7 @@ export function TransferPicker() {
 
         <div className="flex items-center justify-between border-t border-hairline px-5 py-3">
           <span className="font-mono text-[10px] text-ink-faint">
-            dest: {locations.find((l) => l.id === locId)?.name ?? '—'}
+            dest: {locations.find((l) => l.id === locId)?.name ?? '-'}
             {path.length > 0 ? `/${path.map((p) => p.name).join('/')}` : ''}
           </span>
           <div className="flex gap-2">

@@ -9,7 +9,7 @@ import (
 	"google.golang.org/api/option"
 )
 
-// AccountInfo is the minimal identity we need after sign-in — just enough
+// AccountInfo is the minimal identity we need after sign-in: just enough
 // to give the location a human-readable name in the sidebar.
 type AccountInfo struct {
 	Email string

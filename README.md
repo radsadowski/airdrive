@@ -40,8 +40,8 @@ xattr -d com.apple.quarantine /Applications/AirDrive.app
 
 - [Features](#features)
   - [📁 File Management](#-file-management)
-  - [☁️ Storage Providers](#️-storage-providers)
-  - [🔄 Transfers](#-transfers)
+  - [☁️ Where Your Files Can Live](#️-where-your-files-can-live)
+  - [🔄 Moving Files Between Storages](#-moving-files-between-storages)
   - [🔒 Security](#-security)
 - [📋 Requirements](#-requirements)
 - [🗺️ Roadmap](#️-roadmap)
@@ -57,50 +57,52 @@ xattr -d com.apple.quarantine /Applications/AirDrive.app
 
 ### 📁 File Management
 
-- **Browse & navigate**: folder trees across all connected locations,
-  instant listing from the local SQLite index (no network on click)
-- **🔍 Full-text search**: FTS5-powered search across every indexed file,
-  filterable by size, date, and kind
-- **✏️ File operations**: create, rename, move, and delete (to provider
-  trash, never permanent)
-- **🖼️ Image thumbnails**: in the browser grid for local folders (via
-  macOS `sips`) and Google Drive (server-side thumbnails), served from
-  an etag-keyed cache
+- **All your files, one window**: browse every connected location side
+  by side: folders on this Mac, Google Drive, S3 buckets
+- **Instant browsing**: folders open right away, even in the cloud;
+  nothing waits on the network
+- **🔍 Search everything**: find any file by name across all your
+  storage at once; narrow it down by size, date, or type
+- **✏️ Everyday file actions**: create folders, rename, move, and
+  delete. Deleting always goes to a trash, never permanently
+- **🖼️ Photos and videos at a glance**: real image thumbnails and video
+  stills in the grid, plus a large preview when you open a file
 
-### ☁️ Storage Providers
+### ☁️ Where Your Files Can Live
 
-- **💾 Local folders**: indexed with fsnotify live watching
-- **📧 Google Drive**: OAuth sign-in with a folder picker that scopes
-  the location to one Drive folder or all of My Drive; starred folders
-  (including Drive-for-desktop "Computers" backups) are pickable
-- **🪣 S3-compatible buckets**: R2, MinIO, B2, or AWS via connection
-  testing with bucket listing; deletions go to an in-bucket
-  `.airdrive-trash/` prefix
+- **💾 Local folders**: any folder on this Mac; new and changed files
+  show up on their own
+- **📧 Google Drive**: sign in with your Google account, then connect
+  all of My Drive or just one folder. Starred folders and
+  Drive-for-desktop computer backups work too
+- **🪣 S3-compatible storage**: Cloudflare R2, MinIO, Backblaze B2, or
+  AWS. Deleting moves files to a trash folder inside the bucket, so an
+  accidental click never destroys anything
 
-### 🔄 Transfers
+### 🔄 Moving Files Between Storages
 
-- **📋 Copy & move** between any two locations (e.g. Drive → R2, local
-  → S3, S3 → local)
-- **⚖️ Conflict policies**: smart (skip identical, keep both on
-  difference), overwrite, or skip existing
-- **✅ MD5 verification**: content hash verified end-to-end during
-  transfer when the source exposes a checksum
-- **📊 Progress & controls**: per-file byte progress with speed in
-  the transfers panel; pause, resume, cancel, and retry-failed
-- **🗑️ Move semantics**: source items are trashed only after all
-  their files transfer successfully; a failed job keeps the source
-  intact
-- **⬆️ Uploads**: drag-and-drop files from Finder onto any location,
-  or use the Upload button with the native file picker
+- **📋 Copy or move**: drive to bucket, Mac to cloud, cloud to Mac;
+  anything to anything
+- **⚖️ You decide what happens to duplicates**: keep both, replace, or
+  skip. By default identical files are skipped and different ones are
+  kept side by side
+- **✅ Arrives intact**: every copy is double-checked on arrival, so a
+  broken transfer never silently replaces a good file
+- **📊 Live progress**: watch per-file speed, pause and resume big
+  copies, cancel, or retry just the files that failed
+- **⬆️ Uploads**: drop files from Finder onto any cloud location, or
+  use the Upload button
 
 ### 🔒 Security
 
-- **🔐 OAuth 2.0 with PKCE** for Google Drive: tokens live in the macOS
-  Keychain, never in SQLite
-- **🔑 S3 credentials**: access keys stored in the Keychain, never on
-  disk in plain text
-- **🛡️ Never-permanent deletes**: local folders go to `~/.Trash`,
-  Drive to Drive's trash, S3 to the in-bucket trash prefix
+- **🔐 Sign in the standard way**: Google sign-in happens in your
+  browser; the sign-in token stays in the macOS Keychain, never in the
+  app's own database
+- **🔑 Cloud passwords protected**: S3 access keys also live in the
+  Keychain, never on disk in plain text
+- **🛡️ Nothing is erased outright**: local files go to the Mac trash,
+  Drive files to Drive trash, bucket files to a trash folder you can
+  empty yourself
 
 ## 📋 Requirements
 

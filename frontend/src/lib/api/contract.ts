@@ -1,10 +1,10 @@
 /**
- * THE CONTRACT — AirDrive API spec.
+ * THE CONTRACT: AirDrive API spec.
  *
  * The frontend only ever talks to `ApiClient` + `EventBus` (ports/adapters).
  * Two implementations exist:
- *   - `lib/api/mock/client.ts`   — stateful in-memory app, runs in a plain browser
- *   - `lib/api/wails/client.ts` — wraps generated Wails v3 bindings + Events.On
+ *   - `lib/api/mock/client.ts`  : stateful in-memory app, runs in a plain browser
+ *   - `lib/api/wails/client.ts`: wraps generated Wails v3 bindings + Events.On
  *
  * Types here mirror the Go bridge 1:1. Drift between the two clients is a build
  * error, not a bug report.
@@ -50,7 +50,7 @@ export interface S3LocationConfig {
   pathStyle: boolean
 }
 
-/** phase 1 of the Drive connect flow — sign-in result, valid ~10 minutes */
+/** phase 1 of the Drive connect flow: sign-in result, valid ~10 minutes */
 export interface GdriveSession {
   sessionId: string
   email: string
@@ -74,10 +74,10 @@ export interface FileInfo {
   size: number
   mime: string
   modifiedAt: string
-  /** rev (Drive) / ETag (S3) / modtime+size (local) — the change-detection anchor */
+  /** rev (Drive) / ETag (S3) / modtime+size (local): the change-detection anchor */
   etag: string
   previewKind?: PreviewKind
-  /** images only — real: served by the Go asset middleware at /thumb/{locationId}/{fileId}; mock: seeded picsum URLs */
+  /** images only: real: served by the Go asset middleware at /thumb/{locationId}/{fileId}; mock: seeded picsum URLs */
   thumbnailUrl?: string
 }
 
@@ -231,7 +231,7 @@ export interface EventBus {
 }
 
 /* ------------------------------------------------------------------ */
-/* The client — mirrors the Wails bridge services 1:1                   */
+/* The client: mirrors the Wails bridge services 1:1                   */
 /* ------------------------------------------------------------------ */
 
 export interface AddLocalRequest {
@@ -248,7 +248,7 @@ export interface ApiClient {
   connectGdrive(): Promise<GdriveSession>
   /** phase 2a: folder-only listing for the picker (dirId null = My Drive root) */
   browseGdriveFolders(sessionId: string, dirId: string | null): Promise<FileInfo[]>
-  /** starred folders account-wide — the only API path to Drive-for-desktop "Computers" folders */
+  /** starred folders account-wide: the only API path to Drive-for-desktop "Computers" folders */
   starredGdriveFolders(sessionId: string): Promise<FileInfo[]>
   /** phase 2b: create the location rooted at the picked folder (null = whole Drive) */
   confirmGdriveLocation(sessionId: string, folderId: string | null): Promise<Location>

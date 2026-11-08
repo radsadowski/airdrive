@@ -1,4 +1,4 @@
-// Token rotation persistence — loopback.go's documented contract.
+// Token rotation persistence: loopback.go's documented contract.
 package auth
 
 import (
@@ -11,7 +11,7 @@ import (
 
 // NewPersistingTokenSource returns a TokenSource that refreshes access
 // tokens and re-saves the credential whenever Google rotates the refresh
-// token — otherwise a rotation dies with the app process and the location
+// token: otherwise a rotation dies with the app process and the location
 // must be re-connected.
 func NewPersistingTokenSource(ctx context.Context, logger *slog.Logger, locationID string, tok GdriveToken) oauth2.TokenSource {
 	if logger == nil {

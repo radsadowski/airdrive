@@ -5,7 +5,7 @@ import { mockClient } from '@/lib/api/mock/client'
 import { useAppStore } from '@/stores/app'
 import { cn } from '@/lib/utils'
 
-/** the mock's floating dev panel — failure injection, offline, latency, stress */
+/** the mock's floating dev panel: failure injection, offline, latency, stress */
 export function DevPanel() {
   const [open, setOpen] = useState(false)
   const [offline, setOffline] = useState(false)
@@ -44,7 +44,7 @@ export function DevPanel() {
               )}
             >
               {offline ? <WifiOff size={13} /> : <Wifi size={13} />}
-              {offline ? 'offline — remote providers fail' : 'go offline'}
+              {offline ? 'offline: remote providers fail' : 'go offline'}
             </button>
 
             <button

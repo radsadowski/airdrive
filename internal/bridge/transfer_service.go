@@ -1,4 +1,4 @@
-// TransferService — the copy/move/upload engine: enqueues jobs, streams bytes
+// TransferService: the copy/move/upload engine: enqueues jobs, streams bytes
 // between providers with conflict policies, MD5 verification, throttling, and
 // progress events consumed by the transfers panel.
 package bridge
@@ -631,7 +631,7 @@ func joinPath(dir, file string) string {
 }
 
 // dedupeName returns a name that doesn't collide, appending (N) before the
-// extension — the mock's scheme.
+// extension: the mock's scheme.
 func dedupeName(name string, exists func(string) bool) string {
 	if !exists(name) {
 		return name
@@ -651,4 +651,4 @@ func relRoot(relPath []string, id string) string {
 	return id
 }
 
-// EnqueueRequest is the bridge-level input for Enqueue — lives in entities.
+// EnqueueRequest is the bridge-level input for Enqueue: lives in entities.

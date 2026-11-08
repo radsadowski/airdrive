@@ -15,7 +15,7 @@ var _ provider.StorageProvider = (*Provider)(nil)
 // SyncChanges implements incremental sync: cursor "" = full walk (the start
 // token is captured before enumerating, so changes made during the walk are
 // caught next time), any other cursor = changes.list pagination. Live
-// changes are emitted as ChangeCreated (upserts — created vs modified is
+// changes are emitted as ChangeCreated (upserts: created vs modified is
 // indistinguishable from a single change entry). Roots outside the My Drive
 // corpus (Computers section) never appear in the changes feed, so they
 // always re-list the subtree instead.

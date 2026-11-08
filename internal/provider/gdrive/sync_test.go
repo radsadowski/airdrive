@@ -252,7 +252,7 @@ func TestWhenARootSitsOutsideMyDriveThenSyncAlwaysRelists(t *testing.T) {
 	r.Equal("F1", events[0].FileID)
 
 	for _, rr := range fd.methodReqs() {
-		r.NotEqual("/drive/v3/changes", rr.Path, "roots outside My Drive are invisible to the changes feed — always re-list")
+		r.NotEqual("/drive/v3/changes", rr.Path, "roots outside My Drive are invisible to the changes feed: always re-list")
 	}
 }
 

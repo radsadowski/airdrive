@@ -22,7 +22,7 @@ func TestWhenTheBucketIsWalkedThenFilesAndSynthesizedDirsAreEmitted(t *testing.T
 		events = append(events, batch...)
 	})
 	r.NoError(err)
-	r.Empty(cursor, "S3 has no incremental cursor — refresh always re-walks")
+	r.Empty(cursor, "S3 has no incremental cursor: refresh always re-walks")
 
 	byID := map[string]provider.ChangeKind{}
 	for _, e := range events {

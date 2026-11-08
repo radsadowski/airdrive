@@ -479,7 +479,7 @@ func TestWhenAnObjectIsMappedThenAPlainMD5EtagBecomesTheChecksum(t *testing.T) {
 	p, _ := newTestProvider(t, nil)
 
 	fi := p.toFileInfo("photos/a.png", 123, `"d41d8cd98f00b204e9800998ecf8427e"`, time.Time{})
-	r.Equal("d41d8cd98f00b204e9800998ecf8427e", fi.MD5, "plain ETags are MD5s — quotes stripped")
+	r.Equal("d41d8cd98f00b204e9800998ecf8427e", fi.MD5, "plain ETags are MD5s: quotes stripped")
 
 	fi = p.toFileInfo("big.bin", 999, `"89f2bfe1c5f9c8b1c5f9c8b1c5f9c8b1-3"`, time.Time{})
 	r.Empty(fi.MD5, "multipart ETags are not MD5s")

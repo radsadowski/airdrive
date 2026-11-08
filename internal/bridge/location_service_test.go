@@ -576,7 +576,7 @@ func TestWhenANonReconcileCrawlRunsThenAbsentFilesAreKept(t *testing.T) {
 	svc.crawl("L1", p)
 
 	_, err := db.FileByID(ctx, "L1", "GHOST")
-	r.NoError(err, "changes-feed providers manage deletions themselves — no reconcile")
+	r.NoError(err, "changes-feed providers manage deletions themselves: no reconcile")
 }
 
 // ---- S3 connect / restore -------------------------------------------------- //
@@ -692,7 +692,7 @@ func TestWhenAnS3LocationIsAddedThenItIsPersistedAndCrawled(t *testing.T) {
 	r.NoError(err)
 	r.Equal("s3", loc.Kind)
 	r.Equal("content", loc.Root)
-	r.Equal("R2 — content", loc.Name)
+	r.Equal("R2: content", loc.Name)
 	r.Equal("indexing", loc.Status)
 
 	stored, err := db.LocationByID(ctx, loc.ID)
@@ -747,7 +747,7 @@ func TestWhenARestoredS3LocationExistsThenItRegistersAndReconciles(t *testing.T)
 	ctx := context.Background()
 	ctrl := gomock.NewController(t)
 
-	seedLocation(t, db, index.Location{ID: "S3L", Kind: provider.KindS3, Name: "R2 — content", Root: "content"})
+	seedLocation(t, db, index.Location{ID: "S3L", Kind: provider.KindS3, Name: "R2: content", Root: "content"})
 	r.NoError(db.SetConfigValues(ctx, "S3L", map[string]string{
 		"s3Endpoint":  "https://acct.r2.cloudflarestorage.com",
 		"s3Region":    "auto",

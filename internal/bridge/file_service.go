@@ -16,7 +16,7 @@ import (
 	"github.com/radosny/airdrive/internal/provider"
 )
 
-// Sort field name constants — must match the TypeScript SortField union
+// Sort field name constants: must match the TypeScript SortField union
 // ('name' | 'size' | 'modifiedAt' | 'kind') in frontend/src/lib/api/contract.ts.
 const (
 	sortFieldSize       = "size"

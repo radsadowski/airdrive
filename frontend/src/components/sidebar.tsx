@@ -67,7 +67,7 @@ function LocationRow({ loc, collapsed }: { loc: Location; collapsed: boolean }) 
 
   const row = collapsed ? (
     <button
-      title={`${loc.name} — ${statusTitle}`}
+      title={`${loc.name}: ${statusTitle}`}
       onClick={() => void selectLocation(loc.id)}
       onDragOver={(e) => {
         if (!current) {
@@ -209,7 +209,7 @@ function LocationRow({ loc, collapsed }: { loc: Location; collapsed: boolean }) 
               <span className="font-medium text-ink">{loc.name}</span> will be disconnected from AirDrive and its index will be cleared.
             </p>
             <p className="mt-2 text-[12px] text-ink-faint">
-              Your actual files are not affected — nothing is deleted from disk or cloud storage.
+              Your actual files are not affected: nothing is deleted from disk or cloud storage.
             </p>
           </DialogBody>
           <DialogFooter>

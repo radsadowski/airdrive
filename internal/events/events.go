@@ -3,7 +3,7 @@
 // a typo is a compile error, not a silent missing event.
 //
 // The same names must also match the TypeScript AppEventMap in
-// frontend/src/lib/api/contract.ts — update both together when adding events.
+// frontend/src/lib/api/contract.ts: update both together when adding events.
 package events
 
 const (

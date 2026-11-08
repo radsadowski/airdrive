@@ -34,7 +34,7 @@ func TestWhenFoldersAreBrowsedThenOnlySubfoldersAreListed(t *testing.T) {
 	r.Len(folders, 2)
 	r.Equal("D1", folders[0].ID)
 	r.Equal(provider.FileKindDir, folders[0].Kind)
-	r.Equal("ROOTID", folders[0].ParentID, "the picker navigates by ID — parents stay verbatim")
+	r.Equal("ROOTID", folders[0].ParentID, "the picker navigates by ID: parents stay verbatim")
 
 	reqs := fd.methodReqs()
 	r.Len(reqs, 1)

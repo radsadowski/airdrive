@@ -65,7 +65,7 @@ func main() {
 	})
 
 	// Watcher is created before the app so it can be passed into services.
-	// The onChange callback emits fs:changed via the app — set after New.
+	// The onChange callback emits fs:changed via the app: set after New.
 	var appRef *application.App
 	w, err := watcher.New(db, logger, func(locationID, dirID string) {
 		if appRef != nil {

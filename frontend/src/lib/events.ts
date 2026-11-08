@@ -1,5 +1,5 @@
 /**
- * Event wiring — the Go→UI contract events, wired into the stores.
+ * Event wiring: the Go→UI contract events, wired into the stores.
  * Called once from main.tsx. Under Wails the same names arrive via Events.On;
  * under the mock they come from the in-memory bus.
  */

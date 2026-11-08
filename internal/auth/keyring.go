@@ -42,7 +42,7 @@ func LoadToken(locationID string) (GdriveToken, error) {
 
 // DeleteToken removes a location's credentials from the Keychain.
 // Safe to call even if nothing is stored (e.g. RemoveLocation on a location
-// that failed mid-sign-in) — ErrNotFound is treated as success.
+// that failed mid-sign-in): ErrNotFound is treated as success.
 func DeleteToken(locationID string) error {
 	if err := keyring.Delete(keyringService, locationID); err != nil && !errors.Is(err, keyring.ErrNotFound) {
 		return fmt.Errorf("keychain delete: %w", err)

@@ -97,7 +97,7 @@ func SignIn(ctx context.Context, openBrowser openBrowserFunc) (SignInResult, err
 		}
 		if q.Get("state") != state {
 			writeCallbackPage(w, false)
-			resultCh <- result{err: errors.New("state mismatch — possible CSRF, aborting")}
+			resultCh <- result{err: errors.New("state mismatch: possible CSRF, aborting")}
 			return
 		}
 		code := q.Get("code")
@@ -146,7 +146,7 @@ func SignIn(ctx context.Context, openBrowser openBrowserFunc) (SignInResult, err
 // The caller should persist the token again if it has changed (check
 // tok.AccessToken / tok.Expiry after each use, or wrap with oauth2.ReuseTokenSource).
 func TokenSource(ctx context.Context, tok GdriveToken) oauth2.TokenSource {
-	// redirectURL is irrelevant for refresh — only ClientID/Secret/Endpoint matter.
+	// redirectURL is irrelevant for refresh: only ClientID/Secret/Endpoint matter.
 	cfg := oauthConfig("")
 	return cfg.TokenSource(ctx, tok.toOAuthToken())
 }

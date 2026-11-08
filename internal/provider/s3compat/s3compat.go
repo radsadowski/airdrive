@@ -1,7 +1,7 @@
 // Package s3compat implements StorageProvider for one S3-compatible bucket
 // (R2, MinIO, B2, AWS) via minio-go. File IDs are object keys; directories
 // are prefixes with a trailing slash; root is "". Deletions move objects to
-// the in-bucket .airdrive-trash/ prefix — never permanent.
+// the in-bucket .airdrive-trash/ prefix: never permanent.
 package s3compat
 
 //go:generate go run go.uber.org/mock/mockgen -source=s3compat.go -destination=mock/mock.go -package=mock
@@ -24,7 +24,7 @@ import (
 // TrashPrefix is the in-bucket location deletions are moved to.
 const TrashPrefix = ".airdrive-trash/"
 
-// Config carries everything needed to reach a bucket — no secrets.
+// Config carries everything needed to reach a bucket: no secrets.
 type Config struct {
 	Endpoint  string // https://<account>.r2.cloudflarestorage.com
 	Region    string
@@ -52,14 +52,14 @@ var (
 	_ provider.Reconciler      = (*Provider)(nil)
 )
 
-// Reconciles reports that the bucket has no changes feed — the crawl must
+// Reconciles reports that the bucket has no changes feed: the crawl must
 // diff the walk against the index to detect deletions.
 func (p *Provider) Reconciles() bool { return true }
 
 // BucketLister validates connectivity for the connect wizard's Test button.
 type BucketLister interface {
 	ListBuckets(ctx context.Context) ([]string, error)
-	// BucketExists probes one bucket — the fallback for bucket-scoped R2
+	// BucketExists probes one bucket: the fallback for bucket-scoped R2
 	// tokens, which are denied account-level ListBuckets but can read their
 	// own bucket.
 	BucketExists(ctx context.Context, bucket string) (bool, error)
@@ -134,7 +134,7 @@ func New(locationID string, cfg Config, creds Credentials, logger *slog.Logger) 
 }
 
 // DescribeError renders a minio error response with its status code and
-// request id — the fields needed to diagnose R2 permission problems. minio
+// request id: the fields needed to diagnose R2 permission problems. minio
 // returns ErrorResponse by value; both value and pointer forms are accepted.
 func DescribeError(err error) string {
 	var val minio.ErrorResponse

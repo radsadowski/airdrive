@@ -261,7 +261,7 @@ export function FileBrowser() {
                         <FileIcon file={file} size={16} />
                         <span className="min-w-0 flex-1 truncate text-[13px] text-ink">{file.name}</span>
                         <span className="w-[74px] shrink-0 text-right font-mono text-[11px] tabular text-ink-faint">
-                          {file.kind === 'dir' ? '—' : formatBytes(file.size, 0)}
+                          {file.kind === 'dir' ? '-' : formatBytes(file.size, 0)}
                         </span>
                         <span className="w-[92px] shrink-0 text-right font-mono text-[11px] tabular text-ink-faint">
                           {formatDate(file.modifiedAt)}

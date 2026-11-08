@@ -44,7 +44,7 @@ interface AppState {
   goForward: () => Promise<void>
   canGoBack: () => boolean
   canGoForward: () => boolean
-  /** @internal — restores a history entry without pushing */ 
+  /** @internal: restores a history entry without pushing */ 
   _restoreEntry: (entry: NavEntry) => Promise<void>
   refresh: () => Promise<void>
   loadMore: () => Promise<void>
@@ -146,7 +146,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       return
     }
     if (!get().locations.some((l) => l.id === id)) {
-      // Freshly created location (e.g. right after a wizard finishes) —
+      // Freshly created location (e.g. right after a wizard finishes):
       // the sidebar's `locations` list won't show it until we refetch.
       await get().reloadLocations()
     }

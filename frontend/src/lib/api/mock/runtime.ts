@@ -1,5 +1,5 @@
 /**
- * TransferEngine — the migration engine, mocked.
+ * TransferEngine: the migration engine, mocked.
  * Mirrors the Go design: journaled per-file jobs, worker slots, conflict
  * resolution at job start, "delete source after verified copy" for moves.
  */
@@ -22,7 +22,7 @@ export class TransferEngine {
   private timer: ReturnType<typeof setInterval> | null = null
   private pausedBatches = new Set<string>()
   private cancelledBatches = new Set<string>()
-  /** offline mode — running jobs fail with a retryable network error */
+  /** offline mode: running jobs fail with a retryable network error */
   offline = false
   /** arm a one-shot transfer failure for the next started job */
   failNext = false
@@ -196,7 +196,7 @@ export class TransferEngine {
     if (this.offline) {
       for (const j of running) {
         j.state = 'failed'
-        j.error = 'network unreachable — will retry when online'
+        j.error = 'network unreachable: will retry when online'
         j.speed = 0
         this.emitJob(j)
       }
@@ -356,7 +356,7 @@ export class TransferEngine {
 }
 
 /* ------------------------------------------------------------------ */
-/* Crawl engine — fake index:progress over a few seconds                */
+/* Crawl engine: fake index:progress over a few seconds                */
 /* ------------------------------------------------------------------ */
 
 export function runFakeCrawl(

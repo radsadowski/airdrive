@@ -37,7 +37,7 @@ export function Onboarding() {
           One cockpit for every storage you own
         </h1>
         <p className="mx-auto mt-2.5 max-w-[360px] text-[13px] leading-relaxed text-ink-mut">
-          Local folders, Google Drive and S3-compatible buckets — browse, search and
+          Local folders, Google Drive and S3-compatible buckets: browse, search and
           migrate between them. Nothing leaves this machine except your files.
         </p>
 

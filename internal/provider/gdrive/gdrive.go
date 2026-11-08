@@ -1,5 +1,5 @@
 // Package gdrive implements StorageProvider for one Google Drive (My Drive)
-// location. It never imports internal/auth — callers hand it an oauth2.TokenSource.
+// location. It never imports internal/auth: callers hand it an oauth2.TokenSource.
 package gdrive
 
 import (
@@ -30,13 +30,13 @@ type Provider struct {
 	rootID     string // effective root: the picked folder, or the resolved Drive root
 	syncRoot   string // picked folder ID; "" = whole Drive
 	// syncRootInMyDrive is false when the picked root sits outside the My Drive
-	// corpus (Computers section) — those files never appear in the changes
+	// corpus (Computers section): those files never appear in the changes
 	// feed, so SyncChanges always re-lists instead.
 	syncRootInMyDrive bool
 	logger            *slog.Logger
 }
 
-// New builds a Provider scoped to rootID — the Drive folder to sync ("" =
+// New builds a Provider scoped to rootID: the Drive folder to sync ("" =
 // whole Drive, resolved to the real root ID). The effective root normalises
 // toFileInfo's parentID ("" under the sync root), and a retrying transport
 // layers under OAuth. Extra ClientOptions are appended for tests.
