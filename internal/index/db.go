@@ -918,3 +918,28 @@ func (d *DB) SyncStateRows(ctx context.Context, pairID string) ([]SyncState, err
 	}
 	return out, rows.Err()
 }
+
+const fileCols = "id,location_id,parent_id,name,kind,size,mime,etag,md5,preview_kind,modified_at"
+
+// scanFiles drains rows of fileCols selections.
+func (d *DB) scanFiles(rows *sql.Rows) ([]provider.FileInfo, error) {
+	defer rows.Close()
+	var out []provider.FileInfo
+	for rows.Next() {
+		f, err := scanFileRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, f)
+	}
+	return out, rows.Err()
+}
+
+// AllFiles returns every indexed row of a location (dirs included).
+func (d *DB) AllFiles(ctx context.Context, locationID string) ([]provider.FileInfo, error) {
+	rows, err := d.db.QueryContext(ctx, `SELECT `+fileCols+` FROM files WHERE location_id=?`, locationID)
+	if err != nil {
+		return nil, err
+	}
+	return d.scanFiles(rows)
+}

@@ -29,6 +29,10 @@ func New(locationID, root string) *Provider {
 func (p *Provider) ID() string          { return p.locationID }
 func (p *Provider) Kind() provider.Kind { return provider.KindLocalFS }
 
+// Reconciles: localfs sync is a full inventory walk, so the crawler must
+// diff deletions out of the index (fsnotify covers live removals).
+func (p *Provider) Reconciles() bool { return true }
+
 // ---- helpers ------------------------------------------------------------- //
 
 // abs resolves a fileID (which IS the absolute path for localfs) and checks

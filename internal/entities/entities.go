@@ -108,5 +108,6 @@ type SyncPair struct {
 	LastRunAt  string `json:"lastRunAt,omitempty"`
 	LastError  string `json:"lastError,omitempty"`
 	LastCounts string `json:"lastCounts,omitempty"`
+	Backfill   bool   `json:"backfill"` // transient create-time hint, not persisted
 	CreatedAt  string `json:"createdAt"`
 }

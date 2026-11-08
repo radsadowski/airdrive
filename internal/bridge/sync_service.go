@@ -26,7 +26,7 @@ type SyncService struct {
 	db        *index.DB
 	registry  *provider.Registry
 	logger    *slog.Logger
-	reconcile func(ctx context.Context, pairID string) error
+	reconcile func(ctx context.Context, pairID string, opts ReconcileOpts) error
 }
 
 // NewSyncService creates the service; the engine wires reconcile separately.
@@ -35,7 +35,7 @@ func NewSyncService(db *index.DB, registry *provider.Registry, logger *slog.Logg
 		db:       db,
 		registry: registry,
 		logger:   logger,
-		reconcile: func(context.Context, string) error {
+		reconcile: func(context.Context, string, ReconcileOpts) error {
 			return fmt.Errorf("sync engine not started")
 		},
 	}
@@ -83,6 +83,14 @@ func (s *SyncService) CreateSyncPair(ctx context.Context, in entities.SyncPair) 
 	if err := s.db.CreateSyncPair(ctx, row); err != nil {
 		return nil, fmt.Errorf("create sync pair: %w", err)
 	}
+	if in.Backfill {
+		id := row.ID
+		go func() { //nolint:gosec // the initial backfill outlives this Wails request context on purpose
+			if err := s.reconcile(context.Background(), id, ReconcileOpts{Backfill: true, RefreshFirst: true}); err != nil {
+				s.logger.Warn("sync pair: initial backfill", "id", id, "err", err)
+			}
+		}()
+	}
 	created, err := s.db.GetSyncPair(ctx, row.ID)
 	if err != nil {
 		return nil, fmt.Errorf("read created sync pair: %w", err)
@@ -121,7 +129,12 @@ func (s *SyncService) DeleteSyncPair(ctx context.Context, id string) error {
 
 // SyncNow runs one immediate reconcile for the pair, scheduling aside.
 func (s *SyncService) SyncNow(ctx context.Context, id string) error {
-	return s.reconcile(ctx, id)
+	return s.reconcile(ctx, id, ReconcileOpts{RefreshFirst: true})
+}
+
+// SetReconcile installs the engine's hook once the app is running.
+func (s *SyncService) SetReconcile(fn func(ctx context.Context, pairID string, opts ReconcileOpts) error) {
+	s.reconcile = fn
 }
 
 // locationNames resolves both ids and errors when either storage is unknown.

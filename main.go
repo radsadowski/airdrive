@@ -28,6 +28,7 @@ func init() {
 	application.RegisterEvent[map[string]any](ev.TransferUpdated)
 	application.RegisterEvent[map[string]any](ev.TransferBatchDone)
 	application.RegisterEvent[map[string]any](ev.ToastShow)
+	application.RegisterEvent[map[string]any](ev.SyncUpdated)
 }
 
 func main() {
@@ -116,6 +117,10 @@ func main() {
 	locSvc.SetApp(app)
 	fileSvc.SetApp(app)
 	transfers.SetEmit(func(name string, data ...any) { app.Event.Emit(name, data...) })
+	syncEngine := bridge.NewSyncEngine(db, registry, transfers, fileSvc, logger, func(name string, payload map[string]any) {
+		app.Event.Emit(name, payload)
+	})
+	syncSvc.SetReconcile(syncEngine.ReconcileHook())
 
 	app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:  "AirDrive",

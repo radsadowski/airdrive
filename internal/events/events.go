@@ -14,4 +14,5 @@ const (
 	TransferUpdated   = "transfer:updated"
 	TransferBatchDone = "transfer:batchDone"
 	ToastShow         = "toast:show"
+	SyncUpdated       = "sync:updated"
 )
