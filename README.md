@@ -93,6 +93,20 @@ xattr -d com.apple.quarantine /Applications/AirDrive.app
 - **⬆️ Uploads**: drop files from Finder onto any cloud location, or
   use the Upload button
 
+### 🔁 Folder Sync
+
+- **Set it once, forget it**: pair any two storages and folders stay in
+  step: your Mac folder mirrored into your Drive, Drive into R2, or
+  back and forth both ways
+- **You pick the rules**: new files, edited files, and deletions are
+  separate switches. Deletions start switched off, so syncing can never
+  surprise you by tidying a storage you did not mean to tidy
+- **It just runs**: changes you make follow within a minute, and an
+  hourly sweep catches anything missed. Every run shows up as ordinary
+  transfers you can watch in the Transfers drawer
+- **Never data-hungry**: only files that already synced can ever be
+  deleted; files that were never part of the pair are left alone
+
 ### 🔒 Security
 
 - **🔐 Sign in the standard way**: Google sign-in happens in your
@@ -116,9 +130,8 @@ xattr -d com.apple.quarantine /Applications/AirDrive.app
 
 ## 🗺️ Roadmap
 
-- 🔄 **One-way folder sync**: sync a Drive folder into an S3 bucket;
-  Drive changes propagate, S3-side edits stay
-- 🔁 **Two-way folder-pair sync**: R2 as a sync hub across machines
+- ✅ ~~Folder sync~~: one-way and two-way pairs with per-action
+  masks: shipped with sync engines, a scheduler, and a policies UI
 - 📦 **Dropbox & OneDrive**: additional storage providers
 - 🤖 **MCP server**: expose file search and management to AI agents
   via the Model Context Protocol
