@@ -6,6 +6,7 @@ import (
 	"image"
 	"image/color"
 	"image/jpeg"
+	_ "image/png"
 	"os"
 	"path/filepath"
 	"testing"
@@ -73,5 +74,40 @@ func TestWhenTheLocalPathEscapesRootThenThumbnailErrors(t *testing.T) {
 	p := New("L1", t.TempDir())
 
 	_, err := p.Thumbnail(context.Background(), "L1", img, provider.ThumbSmall)
+	r.Error(err)
+}
+
+func TestWhenTheFileIsAVideoThenQuickLookRendersIt(t *testing.T) {
+	t.Parallel()
+	r := require.New(t)
+
+	root := t.TempDir()
+	src, err := os.ReadFile("testdata/fixture.mov") // committed tiny AVFoundation-generated clip
+	r.NoError(err)
+	clip := filepath.Join(root, "clip.mov")
+	r.NoError(os.WriteFile(clip, src, 0o644))
+	p := New("L1", root)
+
+	b, err := p.Thumbnail(context.Background(), "L1", clip, provider.ThumbSmall)
+	r.NoError(err)
+
+	cfg, format, err := image.DecodeConfig(bytes.NewReader(b))
+	r.NoError(err, "the QuickLook output must decode as an image")
+	r.Contains([]string{"jpeg", "png", "gif"}, format)
+	r.LessOrEqual(cfg.Width, provider.ThumbSmall, "width must be capped at the requested size")
+	r.LessOrEqual(cfg.Height, provider.ThumbSmall, "height must be capped at the requested size")
+	r.Greater(cfg.Width, 0)
+}
+
+func TestWhenAVideoFailsToRenderThenTheErrorPropagates(t *testing.T) {
+	t.Parallel()
+	r := require.New(t)
+
+	root := t.TempDir()
+	clip := filepath.Join(root, "bad.mp4")
+	r.NoError(os.WriteFile(clip, []byte("this is not a video container at all"), 0o644))
+	p := New("L1", root)
+
+	_, err := p.Thumbnail(context.Background(), "L1", clip, provider.ThumbSmall)
 	r.Error(err)
 }

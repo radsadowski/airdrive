@@ -1,5 +1,5 @@
 /**
- * WailsClient — implements ApiClient + EventBus using the generated Wails v3 bindings.
+ * WailsClient: implements ApiClient + EventBus using the generated Wails v3 bindings.
  * This is the only file that imports @wailsio/runtime. Phase 2+ swap mock→real
  * one vertical slice at a time by routing calls here instead of MockClient.
  */
@@ -47,7 +47,7 @@ function toFile(f: EntityFile): FileInfo {
     etag: f.etag,
     previewKind: f.previewKind as FileInfo['previewKind'],
     thumbnailUrl:
-      f.previewKind === 'image'
+      f.previewKind === 'image' || f.previewKind === 'video'
         ? `/thumb/${f.locationId}/${encodeURIComponent(f.id)}?v=${encodeURIComponent(f.etag)}`
         : undefined,
   }

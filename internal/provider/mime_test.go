@@ -59,3 +59,25 @@ func TestWhenTheMimeIsClassifiedThenThePreviewKindIsResolved(t *testing.T) {
 		})
 	}
 }
+
+func TestWhenTheExtensionIsAVideoThenThePreviewKindIsVideo(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		file string
+	}{
+		{"when the extension is mp4 then it is video", "clip.mp4"},
+		{"when the extension is mov then it is video", "clip.MOV"},
+		{"when the extension is m4v then it is video", "clip.m4v"},
+		{"when the extension is webm then it is video", "clip.webm"},
+		{"when the extension is mkv then it is video", "clip.mkv"},
+		{"when the extension is avi then it is video", "clip.avi"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			r := require.New(t)
+			r.Equal("video", PreviewKind(MimeFor(tt.file, false)), "MimeFor(%q).PreviewKind must be video", tt.file)
+		})
+	}
+}

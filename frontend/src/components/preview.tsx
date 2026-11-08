@@ -9,7 +9,7 @@ function TextPreview({ file }: { file: FileInfo }) {
   return (
     <div className="allow-scroll flex-1 overflow-auto rounded-[8px] border border-hairline bg-black/30 p-3">
       <pre className="whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-ink-mut">{text}</pre>
-      <div className="mt-2 text-right font-mono text-[9.5px] text-ink-faint">truncated — full file is 3.2× longer</div>
+      <div className="mt-2 text-right font-mono text-[9.5px] text-ink-faint">truncated: full file is 3.2× longer</div>
     </div>
   )
 }
@@ -53,6 +53,29 @@ function ImagePreview({ file }: { file: FileInfo }) {
         onError={() => setFailed(true)}
         className="size-full object-contain"
       />
+    </div>
+  )
+}
+
+function VideoPreview({ file }: { file: FileInfo }) {
+  const [failed, setFailed] = useState(false)
+  const src = previewUrl(file.thumbnailUrl)
+  if (!src || failed) return <MediaPreview file={file} kind="video" />
+  return (
+    <div className="relative flex-1 overflow-hidden rounded-[8px] border border-hairline bg-black/40">
+      <img
+        src={src}
+        alt={file.name}
+        loading="lazy"
+        draggable={false}
+        onError={() => setFailed(true)}
+        className="size-full object-contain"
+      />
+      <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+        <div className="flex size-12 items-center justify-center rounded-full border border-white/25 bg-black/60 backdrop-blur-sm">
+          <Play size={18} className="ml-0.5 fill-white/90 text-white/90" />
+        </div>
+      </div>
     </div>
   )
 }
@@ -143,7 +166,7 @@ export function Preview({ file }: { file: FileInfo }) {
   if (file.kind === 'dir') {
     return (
       <div className="flex flex-1 items-center justify-center rounded-[8px] border border-dashed border-hairline text-[12px] text-ink-faint">
-        folder — open it to browse
+        folder: open it to browse
       </div>
     )
   }
@@ -155,7 +178,7 @@ export function Preview({ file }: { file: FileInfo }) {
     case 'pdf':
       return <PdfPreview file={file} />
     case 'video':
-      return <MediaPreview file={file} kind="video" />
+      return <VideoPreview file={file} />
     case 'audio':
       return <MediaPreview file={file} kind="audio" />
     default:

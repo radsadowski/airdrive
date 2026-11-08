@@ -276,3 +276,32 @@ func TestWhenAnUnknownSizeIsRequestedThenItClampsToTheDefault(t *testing.T) {
 
 	r.Equal([]byte("SMALL"), serveThumbSize(t, svc, "L1", "F1", "42").Body.Bytes())
 }
+
+func TestWhenAVideoPreviewIsRequestedThenItServes(t *testing.T) {
+	t.Parallel()
+	r := require.New(t)
+	svc, db, _ := openThumbService(t)
+	ctrl := gomock.NewController(t)
+
+	seedImage(t, db, "V1", "E1", "video")
+	p := wireThumb(t, svc, ctrl)
+	p.MockThumbnailer.EXPECT().Thumbnail(gomock.Any(), "L1", "V1", provider.ThumbSmall).Return([]byte("VIDTHUMB"), nil)
+
+	rec := serveThumb(t, svc, "L1", "V1")
+	r.Equal(http.StatusOK, rec.Code)
+	r.Equal([]byte("VIDTHUMB"), rec.Body.Bytes())
+}
+
+func TestWhenANonThumbnailableKindIsRequestedThenIt404s(t *testing.T) {
+	t.Parallel()
+	r := require.New(t)
+	svc, db, _ := openThumbService(t)
+	ctrl := gomock.NewController(t)
+
+	seedImage(t, db, "T1", "E1", "text")
+	p := wireThumb(t, svc, ctrl)
+	p.MockThumbnailer.EXPECT().Thumbnail(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+
+	rec := serveThumb(t, svc, "L1", "T1")
+	r.Equal(http.StatusNotFound, rec.Code)
+}

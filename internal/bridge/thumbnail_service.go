@@ -65,7 +65,7 @@ func (s *ThumbnailService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 	fi, err := s.db.FileByID(ctx, locationID, fileID)
-	if err != nil || fi.LocationID != locationID || fi.PreviewKind != provider.PreviewImage {
+	if err != nil || fi.LocationID != locationID || !thumbnailableKind(fi.PreviewKind) {
 		http.NotFound(w, r)
 		return
 	}
@@ -105,7 +105,7 @@ func (s *ThumbnailService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // Middleware routes /thumb requests to the service and everything else to
-// the next handler — handed to wails AssetOptions.Middleware.
+// the next handler: handed to wails AssetOptions.Middleware.
 func (s *ThumbnailService) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.EscapedPath(), thumbRoute) {
@@ -124,6 +124,13 @@ func clampThumbSize(raw string) int {
 		return provider.ThumbSmall
 	}
 	return provider.ThumbLarge
+}
+
+// thumbnailableKind admits the preview kinds the thumb route may render.
+// Providers stay the render authority: a kind they cannot render errors
+// and becomes the icon fallback.
+func thumbnailableKind(kind string) bool {
+	return kind == provider.PreviewImage || kind == "video"
 }
 
 // Sweep drops cache entries whose mtime is older than a month.
