@@ -14,9 +14,9 @@ between providers with MD5 verification.
 
 ## 📥 Installation
 
-**Direct download** — grab the latest `.dmg` from the [Releases](https://github.com/radsadowski/airdrive/releases) page.
+**Direct download**: grab the latest `.dmg` from the [Releases](https://github.com/radsadowski/airdrive/releases) page.
 
-**Homebrew** — add the tap, then install the cask:
+**Homebrew**: add the tap, then install the cask:
 
 ```sh
 brew tap radsadowski/airdrive
