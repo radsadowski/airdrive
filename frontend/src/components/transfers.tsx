@@ -161,7 +161,7 @@ export function TransferDrawer() {
   const overallBytes = active.reduce((a, b) => a + b.bytesDone, 0)
   const overallTotal = active.reduce((a, b) => a + b.bytesTotal, 0)
 
-  if (batches.length === 0 && !open) return null
+  if (!open && active.length === 0) return null
 
   return (
     <div
