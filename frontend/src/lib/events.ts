@@ -6,6 +6,7 @@
 
 import { api } from '@/lib/api'
 import { useAppStore } from '@/stores/app'
+import { useSyncStore } from '@/stores/sync'
 import { useTransfersStore } from '@/stores/transfers'
 import { useUiStore } from '@/stores/ui'
 
@@ -52,5 +53,9 @@ export function wireEvents(): void {
 
   api.on('toast:show', (t) => {
     useUiStore.getState().pushToast(t)
+  })
+
+  api.on('sync:updated', () => {
+    void useSyncStore.getState().load()
   })
 }

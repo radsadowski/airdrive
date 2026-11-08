@@ -10,5 +10,6 @@ export {
     Page,
     S3Config,
     S3TestResult,
-    Settings
+    Settings,
+    SyncPair
 } from "./models.js";

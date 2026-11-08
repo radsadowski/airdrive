@@ -59,6 +59,8 @@ export class MockState {
   children = new Map<string, string[]>()
   batches: TransferBatch[] = []
   jobs: TransferJob[] = []
+  /** sync policies stored exactly like sqlite rows */
+  syncPairs: import('../contract').SyncPair[] = []
   settings: Settings = { ...DEFAULT_SETTINGS }
 
   rootKey(locationId: string): string {
@@ -179,6 +181,20 @@ export class MockState {
       }
     }
     return { fileCount, totalSize }
+  }
+
+  /** flatten a subtree into relative paths, dirs included; root itself maps to "" */
+  subtreeMap(locationId: string, rootDirId: string | null): Map<string, MockFileNode> {
+    const out = new Map<string, MockFileNode>()
+    const walk = (parentId: string | null, rel: string) => {
+      for (const node of this.siblings(locationId, parentId)) {
+        const path = rel ? `${rel}/${node.name}` : node.name
+        out.set(path, node)
+        if (node.kind === 'dir') walk(node.id, path)
+      }
+    }
+    walk(rootDirId ?? null, '')
+    return out
   }
 
   search(q: SearchQuery): Page<FileInfo> {

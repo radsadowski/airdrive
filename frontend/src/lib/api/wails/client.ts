@@ -10,7 +10,9 @@ import * as LocSvc from '@bindings/github.com/radosny/airdrive/internal/bridge/l
 import * as FileSvc from '@bindings/github.com/radosny/airdrive/internal/bridge/fileservice'
 import * as XferSvc from '@bindings/github.com/radosny/airdrive/internal/bridge/transferservice'
 import * as SettingsSvc from '@bindings/github.com/radosny/airdrive/internal/bridge/settingsservice'
-import type { File as EntityFile, Location as EntityLocation, Page as EntityPage } from '@bindings/github.com/radosny/airdrive/internal/entities/models'
+import * as SyncSvc from '@bindings/github.com/radosny/airdrive/internal/bridge/syncservice'
+import type { File as EntityFile, Location as EntityLocation, Page as EntityPage, SyncPair as EntitySyncPair } from '@bindings/github.com/radosny/airdrive/internal/entities/models'
+import type { SyncPair } from '../contract'
 
 // ---- shape adapters ------------------------------------------------------ //
 
@@ -60,9 +62,56 @@ function toPage(p: EntityPage): Page<FileInfo> {
   }
 }
 
+function toSyncPair(p: EntitySyncPair): SyncPair {
+  return {
+    id: p.id,
+    name: p.name,
+    locationA: p.locationA,
+    pathA: p.pathA,
+    locationB: p.locationB,
+    pathB: p.pathB,
+    direction: p.direction as SyncPair['direction'],
+    actions: p.actions,
+    paused: p.paused,
+    lastRunAt: p.lastRunAt || undefined,
+    lastError: p.lastError || undefined,
+    lastCounts: p.lastCounts || undefined,
+    backfill: p.backfill,
+  }
+}
+
 // ---- WailsClient --------------------------------------------------------- //
 
 class WailsClientImpl implements ApiClient, EventBus {
+  // ---- Sync policies ---- //
+
+  async listSyncPairs(): Promise<SyncPair[]> {
+    const pairs = await SyncSvc.ListSyncPairs()
+    return (pairs ?? []).map(toSyncPair)
+  }
+
+  async createSyncPair(pair: SyncPair): Promise<SyncPair> {
+    const created = await SyncSvc.CreateSyncPair(pair as unknown as EntitySyncPair)
+    return toSyncPair(requireNonNull(created, 'createSyncPair'))
+  }
+
+  async updateSyncPair(pair: SyncPair): Promise<SyncPair> {
+    const updated = await SyncSvc.UpdateSyncPair(pair as unknown as EntitySyncPair)
+    return toSyncPair(requireNonNull(updated, 'updateSyncPair'))
+  }
+
+  async deleteSyncPair(id: string): Promise<void> {
+    await SyncSvc.DeleteSyncPair(id)
+  }
+
+  async pauseSync(id: string, paused: boolean): Promise<void> {
+    await SyncSvc.PauseSync(id, paused)
+  }
+
+  async syncNow(id: string): Promise<void> {
+    await SyncSvc.SyncNow(id)
+  }
+
   // ---- EventBus ---- //
 
   on<K extends AppEventName>(name: K, cb: (payload: AppEventMap[K]) => void): () => void {

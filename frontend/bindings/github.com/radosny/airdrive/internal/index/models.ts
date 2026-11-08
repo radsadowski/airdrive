@@ -29,7 +29,7 @@ export class TransferBatch {
     "Done": number;
     "Failed": number;
     "Skipped": number;
-    "Cancelled": number;
+    "Canceled": number;
 
     /** Creates a new TransferBatch instance. */
     constructor($$source: Partial<TransferBatch> = {}) {
@@ -69,8 +69,8 @@ export class TransferBatch {
         if (!("Skipped" in $$source)) {
             this["Skipped"] = 0;
         }
-        if (!("Cancelled" in $$source)) {
-            this["Cancelled"] = 0;
+        if (!("Canceled" in $$source)) {
+            this["Canceled"] = 0;
         }
 
         Object.assign(this, $$source);
@@ -104,7 +104,7 @@ export class TransferJob {
     "DestPath": string;
 
     /**
-     * pending|running|done|failed|skipped|cancelled|paused
+     * pending|running|done|failed|skipped|canceled|paused
      */
     "State": string;
     "BytesTotal": number;

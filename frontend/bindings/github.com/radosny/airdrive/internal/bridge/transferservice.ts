@@ -18,7 +18,7 @@ import * as entities$0 from "../entities/models.js";
 import * as index$0 from "../index/models.js";
 
 /**
- * CancelBatch marks all non-terminal jobs cancelled.
+ * CancelBatch marks all non-terminal jobs canceled.
  */
 export function CancelBatch(batchID: string): $CancellablePromise<void> {
     return $Call.ByID(1113389115, batchID);

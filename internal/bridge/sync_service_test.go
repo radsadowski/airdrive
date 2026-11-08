@@ -100,3 +100,50 @@ func TestWhenAPairIsDeletedThenListingIsEmpty(t *testing.T) {
 	r.NoError(err)
 	r.Empty(pairs)
 }
+
+func TestWhenUpdatingAPairThenItsPolicyFieldsApply(t *testing.T) {
+	t.Parallel()
+	r := require.New(t)
+	svc := openSyncService(t)
+	ctx := context.Background()
+	created, err := svc.CreateSyncPair(ctx, entities.SyncPair{LocationA: "L1", LocationB: "L2"})
+	r.NoError(err)
+
+	updated, err := svc.UpdateSyncPair(ctx, entities.SyncPair{
+		ID: created.ID, Name: "nightly backup", LocationA: "L1", LocationB: "L2",
+		Direction: "both", Actions: 0b111,
+	})
+	r.NoError(err)
+	r.Equal("nightly backup", updated.Name)
+	r.Equal("both", updated.Direction)
+	r.Equal(0b111, updated.Actions)
+
+	gone, err := svc.db.GetSyncPair(ctx, created.ID)
+	r.NoError(err)
+	r.Equal("both", gone.Direction)
+	r.Equal("nightly backup", gone.Name)
+}
+
+func TestWhenUpdatingWithAnUnknownDirectionThenTheServiceRejects(t *testing.T) {
+	t.Parallel()
+	r := require.New(t)
+	svc := openSyncService(t)
+	ctx := context.Background()
+	created, err := svc.CreateSyncPair(ctx, entities.SyncPair{LocationA: "L1", LocationB: "L2"})
+	r.NoError(err)
+
+	_, err = svc.UpdateSyncPair(ctx, entities.SyncPair{
+		ID: created.ID, LocationA: "L1", LocationB: "L2", Direction: "sideways",
+	})
+	r.Error(err)
+}
+
+func TestWhenUpdatingAMissingPairThenTheServiceErrors(t *testing.T) {
+	t.Parallel()
+	r := require.New(t)
+	svc := openSyncService(t)
+	_, err := svc.UpdateSyncPair(context.Background(), entities.SyncPair{
+		ID: "pair_ghost", LocationA: "L1", LocationB: "L2", Direction: "a_to_b",
+	})
+	r.Error(err)
+}

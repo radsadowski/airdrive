@@ -12,6 +12,7 @@ function configure() {
         "fs:changed": $$createType0,
         "index:progress": $$createType0,
         "location:status": $$createType0,
+        "sync:updated": $$createType0,
         "toast:show": $$createType0,
         "transfer:batchDone": $$createType0,
         "transfer:updated": $$createType0,

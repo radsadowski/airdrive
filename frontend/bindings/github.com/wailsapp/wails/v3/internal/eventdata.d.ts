@@ -12,6 +12,7 @@ declare module "@wailsio/runtime" {
             "fs:changed": { [_ in string]?: any };
             "index:progress": { [_ in string]?: any };
             "location:status": { [_ in string]?: any };
+            "sync:updated": { [_ in string]?: any };
             "toast:show": { [_ in string]?: any };
             "transfer:batchDone": { [_ in string]?: any };
             "transfer:updated": { [_ in string]?: any };

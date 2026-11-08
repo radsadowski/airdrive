@@ -222,6 +222,7 @@ export interface AppEventMap {
   'transfer:batchDone': { batchId: string; done: number; skipped: number; failed: number }
   'location:status': { locationId: string; state: LocationStatus; error?: string }
   'toast:show': ToastPayload
+  'sync:updated': { pairId: string; state: 'idle' }
 }
 
 export type AppEventName = keyof AppEventMap
@@ -240,7 +241,44 @@ export interface AddLocalRequest {
   name?: string
 }
 
+/* ------------------------------------------------------------------ */
+/* Sync policies                                                        */
+/* ------------------------------------------------------------------ */
+
+export type SyncDirection = 'a_to_b' | 'b_to_a' | 'both'
+
+/** bitmask mirrors sync_pairs.actions */
+export const SYNC_ACT_CREATE = 1
+export const SYNC_ACT_MODIFY = 2
+export const SYNC_ACT_DELETE = 4
+
+export interface SyncPair {
+  id: string
+  name: string
+  locationA: string
+  pathA: string
+  locationB: string
+  pathB: string
+  direction: SyncDirection
+  actions: number
+  paused: boolean
+  lastRunAt?: string
+  lastError?: string
+  /** JSON: { copied, deleted, skipped, failed } */
+  lastCounts?: string
+  /** create-time hint: fill the destination once, then stay incremental */
+  backfill: boolean
+}
+
 export interface ApiClient {
+  /* ---- sync ---- */
+  listSyncPairs(): Promise<SyncPair[]>
+  createSyncPair(pair: SyncPair): Promise<SyncPair>
+  updateSyncPair(pair: SyncPair): Promise<SyncPair>
+  deleteSyncPair(id: string): Promise<void>
+  pauseSync(id: string, paused: boolean): Promise<void>
+  syncNow(id: string): Promise<void>
+
   /* ---- locations ---- */
   listLocations(): Promise<Location[]>
   addLocalLocation(req: AddLocalRequest): Promise<Location>

@@ -111,7 +111,7 @@ export function SetApp(app: application$0.App | null): $CancellablePromise<void>
 }
 
 /**
- * StarredGdriveFolders lists starred folders account-wide — the only
+ * StarredGdriveFolders lists starred folders account-wide: the only
  * API-visible path to Computers-section (Drive for desktop) folders.
  */
 export function StarredGdriveFolders(sessionID: string): $CancellablePromise<entities$0.File[]> {

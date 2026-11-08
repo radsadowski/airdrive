@@ -13,6 +13,7 @@ interface UiState {
   wizard: WizardKind | null
   settingsOpen: boolean
   settings: Settings
+  syncOpen: boolean
   /** Move/Copy-to picker payload */
   transferPicker: { action: 'copy' | 'move'; fileIds: string[] } | null
   /** in-app clipboard for ⌘C/⌘X/⌘V */
@@ -27,6 +28,7 @@ interface UiState {
   inspect: (file: FileInfo | null) => void
   openWizard: (kind: WizardKind | null) => void
   setSettingsOpen: (open: boolean) => void
+  setSyncOpen: (open: boolean) => void
   loadSettings: () => Promise<void>
   patchSettings: (patch: Partial<Settings>) => Promise<void>
   setTransferPicker: (p: { action: 'copy' | 'move'; fileIds: string[] } | null) => void
@@ -43,6 +45,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   inspectedFile: null,
   wizard: null,
   settingsOpen: false,
+  syncOpen: false,
   settings: {
     theme: 'dark',
     defaultView: 'list',
@@ -90,6 +93,10 @@ export const useUiStore = create<UiState>((set, get) => ({
 
   setSettingsOpen(open) {
     set({ settingsOpen: open })
+  },
+
+  setSyncOpen(open) {
+    set({ syncOpen: open })
   },
 
   async loadSettings() {

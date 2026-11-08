@@ -13,6 +13,7 @@ import { SearchOverlay } from '@/components/search'
 import { Wizards } from '@/components/wizards'
 import { TransferPicker } from '@/components/transfer-picker'
 import { SettingsDialog } from '@/components/settings'
+import { SyncPanel } from '@/components/sync'
 import { PromptDialog } from '@/components/prompt'
 import { Toasts } from '@/components/toasts'
 import { DevPanel } from '@/components/devpanel'
@@ -158,6 +159,7 @@ export function AppShell() {
       <Wizards />
       <TransferPicker />
       <SettingsDialog />
+      <SyncPanel />
       <PromptDialog />
       <Toasts />
       <DevPanel />

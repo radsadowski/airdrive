@@ -412,6 +412,101 @@ class MockClient implements ApiClient {
     Object.assign(this.state.settings, patch)
     return { ...this.state.settings }
   }
+
+  /* ---- sync policies (mock engine: crude relative-path mirror) ---- */
+
+  async listSyncPairs() {
+    await sleep(50)
+    return this.state.syncPairs.map((p) => ({ ...p }))
+  }
+
+  async createSyncPair(pair: Parameters<ApiClient['createSyncPair']>[0]) {
+    await sleep(120)
+    if (pair.locationA === pair.locationB) throw new ApiError('invalid', 'pick two different storages')
+    const locA = this.state.locations.get(pair.locationA)
+    const locB = this.state.locations.get(pair.locationB)
+    if (!locA || !locB) throw new ApiError('invalid', 'unknown location')
+    const row = {
+      ...pair,
+      id: `pair_${nextId('sp')}`,
+      name:
+        pair.name ||
+        `${locA.name} ${pair.direction === 'both' ? 'two-way' : pair.direction === 'b_to_a' ? 'one-way in' : 'one-way'} ${locB.name} pair`,
+    }
+    this.state.syncPairs.push(row)
+    if (row.backfill) void this.runMockReconcile(row.id, true)
+    return { ...row }
+  }
+
+  async updateSyncPair(pair: Parameters<ApiClient['updateSyncPair']>[0]) {
+    await sleep(80)
+    const i = this.state.syncPairs.findIndex((p) => p.id === pair.id)
+    if (i < 0) throw new ApiError('not_found', 'sync pair not found')
+    this.state.syncPairs[i] = { ...this.state.syncPairs[i], ...pair, id: pair.id }
+    return { ...this.state.syncPairs[i] }
+  }
+
+  async deleteSyncPair(id: string): Promise<void> {
+    await sleep(60)
+    this.state.syncPairs = this.state.syncPairs.filter((p) => p.id !== id)
+  }
+
+  async pauseSync(id: string, paused: boolean): Promise<void> {
+    await sleep(40)
+    const p = this.state.syncPairs.find((s) => s.id === id)
+    if (p) p.paused = paused
+  }
+
+  async syncNow(id: string): Promise<void> {
+    await sleep(40)
+    void this.runMockReconcile(id, false)
+  }
+
+  /** simple name-based mirror: enough to demo the flow in a browser */
+  private async runMockReconcile(pairId: string, backfill: boolean): Promise<void> {
+    const pair = this.state.syncPairs.find((p) => p.id === pairId)
+    if (!pair || pair.paused) return
+    void backfill
+    const srcLocId = pair.direction === 'b_to_a' ? pair.locationB : pair.locationA
+    const dstLocId = pair.direction === 'b_to_a' ? pair.locationA : pair.locationB
+    const srcRoot = pair.direction === 'b_to_a' ? pair.pathB : pair.pathA
+    const dstRoot = pair.direction === 'b_to_a' ? pair.pathA : pair.pathB
+    const locB = this.state.locations.get(dstLocId)
+    if (!locB) return
+    await sleep(400)
+    const srcMap = this.state.subtreeMap(srcLocId, srcRoot || null)
+    const dstMap = this.state.subtreeMap(dstLocId, dstRoot || null)
+    let copied = 0
+    for (const [path, node] of srcMap) {
+      if (dstMap.has(path)) continue
+      const segments = path.split('/')
+      const parentPath = segments.slice(0, -1).join('/')
+      let parentId: string | null = dstRoot || null
+      if (parentPath) {
+        if (dstMap.has(parentPath)) {
+          parentId = dstMap.get(parentPath)!.id
+        } else {
+          parentId = this.state.ensureDirPath(dstLocId, dstRoot || null, parentPath.split('/'))
+        }
+      }
+      const clone = {
+        ...node,
+        id: nextId('sync'),
+        parentId,
+        locationId: dstLocId,
+        trashed: false,
+      } as import('./state').MockFileNode
+      this.state.addChild(dstLocId, parentId, clone)
+      if (node.kind === 'dir') dstMap.set(path, clone)
+      copied++
+    }
+    pair.lastRunAt = new Date().toISOString()
+    pair.lastCounts = JSON.stringify({ copied, deleted: 0, skipped: 0, failed: 0 })
+    this.refreshCounts(dstLocId)
+    this.touch(dstLocId, dstRoot || null)
+    bus.emit('sync:updated', { pairId: pair.id, state: 'idle' })
+    this.toast(`Sync complete: ${pair.name}`, `${copied} copied`, 'success')
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -438,6 +533,7 @@ export const mockClient: ApiClient & EventBus & MockDevControls = Object.assign(
     client.state.children.clear()
     client.state.batches = []
     client.state.jobs = []
+    client.state.syncPairs = []
     client.engine.stop()
     client.engine.start()
     client.seed()
@@ -448,6 +544,7 @@ export const mockClient: ApiClient & EventBus & MockDevControls = Object.assign(
     client.state.children.clear()
     client.state.batches = []
     client.state.jobs = []
+    client.state.syncPairs = []
   },
   setOffline(v: boolean): void {
     client.engine.offline = v

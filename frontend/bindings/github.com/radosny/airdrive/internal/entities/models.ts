@@ -378,6 +378,81 @@ export class Settings {
     }
 }
 
+/**
+ * SyncPair is the UI-facing projection of one sync policy row.
+ */
+export class SyncPair {
+    "id": string;
+    "name": string;
+    "locationA": string;
+    "pathA": string;
+    "locationB": string;
+    "pathB": string;
+
+    /**
+     * a_to_b | b_to_a | both
+     */
+    "direction": string;
+    "actions": number;
+    "paused": boolean;
+    "lastRunAt"?: string;
+    "lastError"?: string;
+    "lastCounts"?: string;
+
+    /**
+     * transient create-time hint, not persisted
+     */
+    "backfill": boolean;
+    "createdAt": string;
+
+    /** Creates a new SyncPair instance. */
+    constructor($$source: Partial<SyncPair> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = "";
+        }
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("locationA" in $$source)) {
+            this["locationA"] = "";
+        }
+        if (!("pathA" in $$source)) {
+            this["pathA"] = "";
+        }
+        if (!("locationB" in $$source)) {
+            this["locationB"] = "";
+        }
+        if (!("pathB" in $$source)) {
+            this["pathB"] = "";
+        }
+        if (!("direction" in $$source)) {
+            this["direction"] = "";
+        }
+        if (!("actions" in $$source)) {
+            this["actions"] = 0;
+        }
+        if (!("paused" in $$source)) {
+            this["paused"] = false;
+        }
+        if (!("backfill" in $$source)) {
+            this["backfill"] = false;
+        }
+        if (!("createdAt" in $$source)) {
+            this["createdAt"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SyncPair instance from a string or object.
+     */
+    static createFrom($$source: any = {}): SyncPair {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new SyncPair($$parsedSource as Partial<SyncPair>);
+    }
+}
+
 // Private type creation functions
 const $$createType0 = $Create.Array($Create.Any);
 const $$createType1 = File.createFrom;

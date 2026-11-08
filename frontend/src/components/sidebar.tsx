@@ -1,4 +1,4 @@
-import { HardDrive, Plus, RefreshCw, Settings2, Trash2, Cloud, Globe, Loader2, X, PanelLeft } from 'lucide-react'
+import { HardDrive, Plus, RefreshCw, Settings2, Cloud, Globe, Loader2, X, PanelLeft, ArrowLeftRight } from 'lucide-react'
 import { useState } from 'react'
 import type { Location, ProviderKind } from '@/lib/api/contract'
 import { useAppStore } from '@/stores/app'
@@ -230,6 +230,7 @@ export function Sidebar() {
   const locations = useAppStore((s) => s.locations)
   const openWizard = useUiStore((s) => s.openWizard)
   const setSettingsOpen = useUiStore((s) => s.setSettingsOpen)
+  const setSyncOpen = useUiStore((s) => s.setSyncOpen)
   const sidebarOpen = useUiStore((s) => s.sidebarOpen)
   const toggleSidebar = useUiStore((s) => s.toggleSidebar)
   const collapsed = !sidebarOpen
@@ -286,16 +287,17 @@ export function Sidebar() {
             </button>
             <div className="mt-1 flex">
               <button
+                onClick={() => setSyncOpen(true)}
+                className="flex flex-1 items-center gap-2 rounded-[7px] px-2.5 py-1.5 text-[12px] text-ink-faint transition-colors hover:bg-white/[0.045] hover:text-ink-mut"
+              >
+                <ArrowLeftRight size={13} /> Sync
+              </button>
+              <button
                 onClick={() => setSettingsOpen(true)}
                 className="flex flex-1 items-center gap-2 rounded-[7px] px-2.5 py-1.5 text-[12px] text-ink-faint transition-colors hover:bg-white/[0.045] hover:text-ink-mut"
               >
                 <Settings2 size={13} /> Settings
               </button>
-              <Tooltip label="Trash browsing lands with the real shell (Phase 2)" side="top">
-                <span className="flex items-center rounded-[7px] px-2 py-1.5 font-mono text-[10px] text-ink-faint">
-                  <Trash2 size={13} className="mr-1" /> Trash
-                </span>
-              </Tooltip>
             </div>
           </>
         )}

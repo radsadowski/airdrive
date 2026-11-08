@@ -122,6 +122,48 @@ func (s *SyncService) PauseSync(ctx context.Context, id string, paused bool) err
 	return s.db.UpdateSyncPair(ctx, pair)
 }
 
+// UpdateSyncPair edits an existing pair's name, direction, actions, and
+// paths with the same validation CreateSyncPair points at.
+func (s *SyncService) UpdateSyncPair(ctx context.Context, in entities.SyncPair) (*entities.SyncPair, error) {
+	existing, err := s.db.GetSyncPair(ctx, in.ID)
+	if err != nil {
+		return nil, fmt.Errorf("update sync pair: %w", err)
+	}
+	if in.LocationA == "" || in.LocationB == "" {
+		return nil, fmt.Errorf("pick two storages to sync")
+	}
+	if in.LocationA == in.LocationB {
+		return nil, fmt.Errorf("pick two different storages: a storage cannot sync with itself")
+	}
+	if _, _, err := s.locationNames(ctx, in.LocationA, in.LocationB); err != nil {
+		return nil, err
+	}
+	switch in.Direction {
+	case directionAToB, directionBToA, directionBoth:
+	default:
+		return nil, fmt.Errorf("unknown sync direction %q", in.Direction)
+	}
+	if in.Actions&^0b111 != 0 {
+		return nil, fmt.Errorf("unknown sync actions mask %d", in.Actions)
+	}
+	if in.Actions == 0 {
+		in.Actions = 0b11
+	}
+
+	existing.Name = in.Name
+	existing.LocationA = in.LocationA
+	existing.PathA = in.PathA
+	existing.LocationB = in.LocationB
+	existing.PathB = in.PathB
+	existing.Direction = in.Direction
+	existing.Actions = in.Actions
+	if err := s.db.UpdateSyncPair(ctx, existing); err != nil {
+		return nil, fmt.Errorf("update sync pair: %w", err)
+	}
+	result := entities.ToEntitySyncPair(existing)
+	return &result, nil
+}
+
 // DeleteSyncPair removes a pair and its recorded state.
 func (s *SyncService) DeleteSyncPair(ctx context.Context, id string) error {
 	return s.db.DeleteSyncPair(ctx, id)
