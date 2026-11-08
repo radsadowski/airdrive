@@ -87,11 +87,18 @@ type Reconciler interface {
 	Reconciles() bool
 }
 
+// Thumbnail long-edge sizes (pixels) the bridge route admits. Providers
+// may treat them as approximate.
+const (
+	ThumbSmall = 256
+	ThumbLarge = 1024
+)
+
 // Thumbnailer is the optional provider capability for rendering thumbnails
-// (small, bounded image bytes). Providers that cannot produce them simply
-// don't implement it.
+// (bounded image bytes scaled to size pixels on the long edge). Providers
+// that cannot produce them simply don't implement it.
 type Thumbnailer interface {
-	Thumbnail(ctx context.Context, locationID, fileID string) ([]byte, error)
+	Thumbnail(ctx context.Context, locationID, fileID string, size int) ([]byte, error)
 }
 
 const (

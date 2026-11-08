@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/radosny/airdrive/internal/provider"
 )
@@ -14,7 +16,9 @@ var _ provider.Thumbnailer = (*Provider)(nil)
 
 // Thumbnail fetches the file's server-side thumbnail. Drive's thumbnailLink
 // is short-lived and only resolves with the authenticated OAuth client.
-func (p *Provider) Thumbnail(ctx context.Context, locationID, fileID string) ([]byte, error) {
+// The link carries a size token (=s220) that is rewritten to the requested
+// size so previews are sharp while tiles stay cheap.
+func (p *Provider) Thumbnail(ctx context.Context, locationID, fileID string, size int) ([]byte, error) {
 	f, err := p.svc.Files.Get(fileID).Context(ctx).Fields("thumbnailLink").Do()
 	if err != nil {
 		return nil, fmt.Errorf("gdrive: thumbnail metadata for %q: %w", fileID, err)
@@ -22,7 +26,7 @@ func (p *Provider) Thumbnail(ctx context.Context, locationID, fileID string) ([]
 	if f.ThumbnailLink == "" {
 		return nil, fmt.Errorf("gdrive: no thumbnail for %q", fileID)
 	}
-	resp, err := p.client.Get(f.ThumbnailLink)
+	resp, err := p.client.Get(sizedThumbLink(f.ThumbnailLink, size))
 	if err != nil {
 		return nil, fmt.Errorf("gdrive: fetch thumbnail for %q: %w", fileID, err)
 	}
@@ -36,3 +40,21 @@ func (p *Provider) Thumbnail(ctx context.Context, locationID, fileID string) ([]
 	}
 	return b, nil
 }
+
+// sizedThumbLink rewrites a Drive thumbnail's trailing =s<px> size token to
+// size. Links without the token are returned unchanged: appending one is not
+// sanctioned by the API.
+func sizedThumbLink(link string, size int) string {
+	const marker = "=s"
+	i := strings.LastIndex(link, marker)
+	if i < 0 {
+		return link
+	}
+	for _, ch := range link[i+len(marker):] {
+		if ch < '0' || ch > '9' {
+			return link
+		}
+	}
+	return link[:i] + marker + strconv.Itoa(size)
+}
+

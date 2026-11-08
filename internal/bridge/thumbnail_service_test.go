@@ -87,7 +87,7 @@ func TestWhenAThumbnailIsServedTwiceThenTheProviderIsCalledOnce(t *testing.T) {
 
 	seedImage(t, db, "F1", "E1", "image")
 	p := wireThumb(t, svc, ctrl)
-	p.MockThumbnailer.EXPECT().Thumbnail(gomock.Any(), "L1", "F1").Return([]byte("THUMBDATA"), nil)
+	p.MockThumbnailer.EXPECT().Thumbnail(gomock.Any(), "L1", "F1", provider.ThumbSmall).Return([]byte("THUMBDATA"), nil)
 
 	r.Equal(http.StatusOK, serveThumb(t, svc, "L1", "F1").Code)
 	r.Equal(http.StatusOK, serveThumb(t, svc, "L1", "F1").Code)
@@ -101,13 +101,13 @@ func TestWhenTheEtagChangesThenTheThumbnailIsRefetched(t *testing.T) {
 
 	seedImage(t, db, "F1", "E1", "image")
 	p := wireThumb(t, svc, ctrl)
-	p.MockThumbnailer.EXPECT().Thumbnail(gomock.Any(), "L1", "F1").Return([]byte("V1"), nil)
+	p.MockThumbnailer.EXPECT().Thumbnail(gomock.Any(), "L1", "F1", provider.ThumbSmall).Return([]byte("V1"), nil)
 
 	rec := serveThumb(t, svc, "L1", "F1")
 	r.Equal(http.StatusOK, rec.Code)
 
 	seedImage(t, db, "F1", "E2", "image")
-	p.MockThumbnailer.EXPECT().Thumbnail(gomock.Any(), "L1", "F1").Return([]byte("V2"), nil)
+	p.MockThumbnailer.EXPECT().Thumbnail(gomock.Any(), "L1", "F1", provider.ThumbSmall).Return([]byte("V2"), nil)
 	rec = serveThumb(t, svc, "L1", "F1")
 	r.Equal(http.StatusOK, rec.Code)
 	r.Equal("V2", rec.Body.String(), "etag change must invalidate the cache")
@@ -121,7 +121,7 @@ func TestWhenTheFileIsNotAnImageThenServeReturns404(t *testing.T) {
 
 	seedImage(t, db, "F1", "E1", "binary")
 	p := wireThumb(t, svc, ctrl)
-	p.MockThumbnailer.EXPECT().Thumbnail(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+	p.MockThumbnailer.EXPECT().Thumbnail(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
 	r.Equal(http.StatusNotFound, serveThumb(t, svc, "L1", "F1").Code)
 }
@@ -156,7 +156,7 @@ func TestWhenTheProviderFailsThenServeReturns404(t *testing.T) {
 
 	seedImage(t, db, "F1", "E1", "image")
 	p := wireThumb(t, svc, ctrl)
-	p.MockThumbnailer.EXPECT().Thumbnail(gomock.Any(), "L1", "F1").Return(nil, errors.New("sips exploded"))
+	p.MockThumbnailer.EXPECT().Thumbnail(gomock.Any(), "L1", "F1", provider.ThumbSmall).Return(nil, errors.New("sips exploded"))
 
 	r.Equal(http.StatusNotFound, serveThumb(t, svc, "L1", "F1").Code)
 }
@@ -170,7 +170,7 @@ func TestWhenTheFileIDContainsSlashesThenItRoundTrips(t *testing.T) {
 	fileID := "/tmp/airdrive root/sub dir/photo 1.jpg"
 	seedImage(t, db, fileID, "E1", "image")
 	p := wireThumb(t, svc, ctrl)
-	p.MockThumbnailer.EXPECT().Thumbnail(gomock.Any(), "L1", fileID).Return([]byte("LOCALTHUMB"), nil)
+	p.MockThumbnailer.EXPECT().Thumbnail(gomock.Any(), "L1", fileID, provider.ThumbSmall).Return([]byte("LOCALTHUMB"), nil)
 
 	rec := serveThumb(t, svc, "L1", fileID)
 	r.Equal(http.StatusOK, rec.Code)
@@ -234,4 +234,45 @@ func TestWhenSweepRunsThenStaleCacheEntriesAreRemoved(t *testing.T) {
 	r.NoError(err)
 	_, err = os.Stat(stale)
 	r.True(os.IsNotExist(err))
+}
+
+// serveThumbSize fetches a thumbnail with an explicit ?size= query.
+func serveThumbSize(t *testing.T, svc *ThumbnailService, locationID, fileID, size string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, "/thumb/"+locationID+"/"+url.PathEscape(fileID)+"?size="+size, nil)
+	rec := httptest.NewRecorder()
+	svc.ServeHTTP(rec, req)
+	return rec
+}
+
+func TestWhenASizeIsRequestedThenTheProviderGetsItAndTheCacheStaysSeparate(t *testing.T) {
+	t.Parallel()
+	r := require.New(t)
+	svc, db, _ := openThumbService(t)
+	ctrl := gomock.NewController(t)
+
+	seedImage(t, db, "F1", "E1", "image")
+	p := wireThumb(t, svc, ctrl)
+	p.MockThumbnailer.EXPECT().Thumbnail(gomock.Any(), "L1", "F1", provider.ThumbSmall).Return([]byte("SMALL"), nil)
+	p.MockThumbnailer.EXPECT().Thumbnail(gomock.Any(), "L1", "F1", provider.ThumbLarge).Return([]byte("BIG"), nil)
+
+	r.Equal([]byte("SMALL"), serveThumbSize(t, svc, "L1", "F1", "256").Body.Bytes())
+	r.Equal([]byte("BIG"), serveThumbSize(t, svc, "L1", "F1", "1024").Body.Bytes())
+
+	// Repeat fetches hit the cache: the expectations above are called at most once.
+	r.Equal([]byte("SMALL"), serveThumbSize(t, svc, "L1", "F1", "256").Body.Bytes())
+	r.Equal([]byte("BIG"), serveThumbSize(t, svc, "L1", "F1", "1024").Body.Bytes())
+}
+
+func TestWhenAnUnknownSizeIsRequestedThenItClampsToTheDefault(t *testing.T) {
+	t.Parallel()
+	r := require.New(t)
+	svc, db, _ := openThumbService(t)
+	ctrl := gomock.NewController(t)
+
+	seedImage(t, db, "F1", "E1", "image")
+	p := wireThumb(t, svc, ctrl)
+	p.MockThumbnailer.EXPECT().Thumbnail(gomock.Any(), "L1", "F1", provider.ThumbSmall).Return([]byte("SMALL"), nil)
+
+	r.Equal([]byte("SMALL"), serveThumbSize(t, svc, "L1", "F1", "42").Body.Bytes())
 }

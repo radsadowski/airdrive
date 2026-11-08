@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/radosny/airdrive/internal/provider"
@@ -14,10 +15,10 @@ import (
 // Interface conformance for the optional capability.
 var _ provider.Thumbnailer = (*Provider)(nil)
 
-// Thumbnail renders a 256px JPEG via macOS-native sips; the source path is
-// abs()-sandboxed under the location root. Formats sips cannot read fail
+// Thumbnail renders a size-pixel JPEG via macOS-native sips; the source path
+// is abs()-sandboxed under the location root. Formats sips cannot read fail
 // with an error, which callers turn into a file-icon fallback.
-func (p *Provider) Thumbnail(ctx context.Context, locationID, fileID string) ([]byte, error) {
+func (p *Provider) Thumbnail(ctx context.Context, locationID, fileID string, size int) ([]byte, error) {
 	path, err := p.abs(fileID)
 	if err != nil {
 		return nil, err
@@ -36,7 +37,7 @@ func (p *Provider) Thumbnail(ctx context.Context, locationID, fileID string) ([]
 	}
 	defer os.Remove(name)
 
-	cmd := exec.CommandContext(ctx, "sips", "-Z", "256", "-s", "format", "jpeg", path, "--out", name) //nolint:gosec // path is abs()-sandboxed under the location root
+	cmd := exec.CommandContext(ctx, "sips", "-Z", strconv.Itoa(size), "-s", "format", "jpeg", path, "--out", name) //nolint:gosec // path is abs()-sandboxed under the location root; size comes from the bridge's allowlist
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return nil, fmt.Errorf("localfs: sips: %w: %s", err, strings.TrimSpace(string(out)))
 	}

@@ -23,10 +23,17 @@ function PdfPreview({ file }: { file: FileInfo }) {
   )
 }
 
+function previewUrl(thumbnailUrl?: string): string | undefined {
+  if (!thumbnailUrl) return undefined
+  return thumbnailUrl.startsWith('/thumb/')
+    ? `${thumbnailUrl}&size=1024`
+    : thumbnailUrl.replace('/256/256', '/640/480')
+}
+
 function ImagePreview({ file }: { file: FileInfo }) {
   const [loaded, setLoaded] = useState(false)
   const [failed, setFailed] = useState(false)
-  const src = file.thumbnailUrl?.replace('/256/256', '/640/480')
+  const src = previewUrl(file.thumbnailUrl)
   if (!src || failed) {
     return (
       <div className="flex flex-1 items-center justify-center rounded-[8px] border border-hairline bg-black/30">

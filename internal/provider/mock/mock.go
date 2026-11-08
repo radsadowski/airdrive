@@ -81,18 +81,18 @@ func (m *MockThumbnailer) EXPECT() *MockThumbnailerMockRecorder {
 }
 
 // Thumbnail mocks base method.
-func (m *MockThumbnailer) Thumbnail(ctx context.Context, locationID, fileID string) ([]byte, error) {
+func (m *MockThumbnailer) Thumbnail(ctx context.Context, locationID, fileID string, size int) ([]byte, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Thumbnail", ctx, locationID, fileID)
+	ret := m.ctrl.Call(m, "Thumbnail", ctx, locationID, fileID, size)
 	ret0, _ := ret[0].([]byte)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Thumbnail indicates an expected call of Thumbnail.
-func (mr *MockThumbnailerMockRecorder) Thumbnail(ctx, locationID, fileID any) *gomock.Call {
+func (mr *MockThumbnailerMockRecorder) Thumbnail(ctx, locationID, fileID, size any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Thumbnail", reflect.TypeOf((*MockThumbnailer)(nil).Thumbnail), ctx, locationID, fileID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Thumbnail", reflect.TypeOf((*MockThumbnailer)(nil).Thumbnail), ctx, locationID, fileID, size)
 }
 
 // MockStorageProvider is a mock of StorageProvider interface.

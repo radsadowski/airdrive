@@ -11,6 +11,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/radosny/airdrive/internal/provider"
 )
 
 // writeTestJPEG creates a real w×h JPEG so sips has genuine image input.
@@ -38,7 +40,7 @@ func TestWhenALocalImageThumbnailedThenSipsCapsItAt256px(t *testing.T) {
 	img := writeTestJPEG(t, root, "big.jpg", 1024, 512)
 	p := New("L1", root)
 
-	b, err := p.Thumbnail(context.Background(), "L1", img)
+	b, err := p.Thumbnail(context.Background(), "L1", img, provider.ThumbSmall)
 	r.NoError(err)
 
 	cfg, format, err := image.DecodeConfig(bytes.NewReader(b))
@@ -58,7 +60,7 @@ func TestWhenTheLocalFileIsNotAnImageThenThumbnailErrors(t *testing.T) {
 	require.NoError(t, os.WriteFile(txt, []byte("hi"), 0o644))
 	p := New("L1", root)
 
-	_, err := p.Thumbnail(context.Background(), "L1", txt)
+	_, err := p.Thumbnail(context.Background(), "L1", txt, provider.ThumbSmall)
 	r.Error(err)
 }
 
@@ -70,6 +72,6 @@ func TestWhenTheLocalPathEscapesRootThenThumbnailErrors(t *testing.T) {
 	img := writeTestJPEG(t, outside, "secret.jpg", 64, 64)
 	p := New("L1", t.TempDir())
 
-	_, err := p.Thumbnail(context.Background(), "L1", img)
+	_, err := p.Thumbnail(context.Background(), "L1", img, provider.ThumbSmall)
 	r.Error(err)
 }

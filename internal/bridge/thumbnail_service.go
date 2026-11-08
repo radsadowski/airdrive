@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -69,7 +70,8 @@ func (s *ThumbnailService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cachePath := filepath.Join(s.cacheDir, cacheKey(locationID, fileID, fi.Etag))
+	size := clampThumbSize(r.URL.Query().Get("size"))
+	cachePath := filepath.Join(s.cacheDir, cacheKey(locationID, fileID, fi.Etag, size))
 	if data, rErr := os.ReadFile(cachePath); rErr == nil { //nolint:gosec // cachePath is a sha256-hex file name inside cacheDir, never user input
 		s.writeThumb(w, data)
 		if tErr := os.Chtimes(cachePath, time.Now(), time.Now()); tErr != nil {
@@ -88,7 +90,7 @@ func (s *ThumbnailService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	data, err := th.Thumbnail(ctx, locationID, fileID)
+	data, err := th.Thumbnail(ctx, locationID, fileID, size)
 	if err != nil {
 		s.logger.Warn("thumbnail render", "location", locationID, "file", fileID, "err", err)
 		http.NotFound(w, r)
@@ -112,6 +114,16 @@ func (s *ThumbnailService) Middleware(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// clampThumbSize admits only provider.ThumbSmall and provider.ThumbLarge;
+// anything else falls back to the small tile size.
+func clampThumbSize(raw string) int {
+	size, err := strconv.Atoi(raw)
+	if err != nil || size != provider.ThumbLarge {
+		return provider.ThumbSmall
+	}
+	return provider.ThumbLarge
 }
 
 // Sweep drops cache entries whose mtime is older than a month.
@@ -161,8 +173,9 @@ func (s *ThumbnailService) writeCache(path string, data []byte) {
 	}
 }
 
-// cacheKey hashes the identity triple so any etag change invalidates.
-func cacheKey(locationID, fileID, etag string) string {
-	sum := sha256.Sum256([]byte(locationID + "\x00" + fileID + "\x00" + etag))
+// cacheKey hashes the identity quadruple so any etag or size change
+// invalidates.
+func cacheKey(locationID, fileID, etag string, size int) string {
+	sum := sha256.Sum256([]byte(locationID + "\x00" + fileID + "\x00" + etag + "\x00" + strconv.Itoa(size)))
 	return hex.EncodeToString(sum[:]) + ".thumb"
 }
