@@ -124,6 +124,14 @@ xattr -d com.apple.quarantine /Applications/AirDrive.app
   analysis across all connected storage
 - 🏷️ **Smart organization**: AI-powered auto-tagging, duplicate
   detection, and content-based file suggestions
+- 📸 **Instagram backup**: archive your posts, reels, stories and media
+  into any connected location. Professional (Creator/Business) accounts
+  via the Instagram Graph API `GET /me/media`; personal accounts by
+  ingesting Meta's data-export archives (no official personal-account API
+  since Meta retired Basic Display in December 2024)
+- 👥 **Facebook backup**: archive Facebook posts and media the same way,
+  scoped to what Meta's API permissions allow, plus data-export ingestion
+  as the universal fallback
 
 ## 🛠️ Development
 
