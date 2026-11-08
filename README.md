@@ -132,6 +132,11 @@ xattr -d com.apple.quarantine /Applications/AirDrive.app
 - 👥 **Facebook backup**: archive Facebook posts and media the same way,
   scoped to what Meta's API permissions allow, plus data-export ingestion
   as the universal fallback
+- 🗺️ **Photo map**: plot photos on an interactive world map by their GPS
+  coordinates, clustered by place, with jump from a pin to the file's
+  folder. Coordinates come from EXIF metadata (local files, and cloud
+  files read during indexing); Instagram strips EXIF, so Instagram posts
+  use the separate location tag in export metadata instead
 
 ## 🛠️ Development
 
