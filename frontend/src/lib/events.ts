@@ -58,4 +58,8 @@ export function wireEvents(): void {
   api.on('sync:updated', () => {
     void useSyncStore.getState().load()
   })
+
+  api.on('sync:progress', (p) => {
+    useSyncStore.getState().applyProgress(p)
+  })
 }

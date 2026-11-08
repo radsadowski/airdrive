@@ -29,6 +29,7 @@ func init() {
 	application.RegisterEvent[map[string]any](ev.TransferBatchDone)
 	application.RegisterEvent[map[string]any](ev.ToastShow)
 	application.RegisterEvent[map[string]any](ev.SyncUpdated)
+	application.RegisterEvent[map[string]any](ev.SyncProgress)
 }
 
 func main() {

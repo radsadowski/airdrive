@@ -223,6 +223,19 @@ export interface AppEventMap {
   'location:status': { locationId: string; state: LocationStatus; error?: string }
   'toast:show': ToastPayload
   'sync:updated': { pairId: string; state: 'idle' }
+  'sync:progress': {
+    pairId: string
+    name: string
+    state: 'syncing' | 'idle'
+    /** per-batch live aggregates while a pass runs; final pass counters when idle */
+    filesDone: number
+    filesTotal: number
+    bytesDone: number
+    bytesTotal: number
+    copied: number
+    deleted: number
+    failed: number
+  }
 }
 
 export type AppEventName = keyof AppEventMap

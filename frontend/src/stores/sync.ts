@@ -1,6 +1,17 @@
 import { create } from 'zustand'
 import type { SyncPair } from '@/lib/api/contract'
 import { api } from '@/lib/api'
+import type { AppEventMap } from '@/lib/api/contract'
+
+/** live view of one running sync pass */
+export interface ActiveSyncRun {
+  pairId: string
+  name: string
+  filesDone: number
+  filesTotal: number
+  bytesDone: number
+  bytesTotal: number
+}
 
 /**
  * Sync store: the pair rows plus the last-known phase per row. Coarse by
@@ -10,16 +21,43 @@ import { api } from '@/lib/api'
 interface SyncState {
   pairs: SyncPair[]
   loaded: boolean
+  activeRuns: Record<string, ActiveSyncRun>
   load: () => Promise<void>
   save: (pair: SyncPair, isNew: boolean) => Promise<SyncPair>
   remove: (id: string) => Promise<void>
   setPaused: (id: string, paused: boolean) => Promise<void>
   runNow: (id: string) => Promise<void>
+  applyProgress: (p: AppEventMap['sync:progress']) => void
 }
 
 export const useSyncStore = create<SyncState>((set, get) => ({
   pairs: [],
   loaded: false,
+  activeRuns: {},
+
+  applyProgress(p) {
+    set((s) => {
+      if (p.state === 'idle') {
+        const next = { ...s.activeRuns }
+        delete next[p.pairId]
+        return { activeRuns: next }
+      }
+      return {
+        activeRuns: {
+          ...s.activeRuns,
+          [p.pairId]: {
+            pairId: p.pairId,
+            name: p.name,
+            filesDone: p.filesDone,
+            filesTotal: p.filesTotal,
+            bytesDone: p.bytesDone,
+            bytesTotal: p.bytesTotal,
+          },
+        },
+      }
+    })
+    if (p.state === 'idle') void get().load()
+  },
 
   async load() {
     const pairs = await api.listSyncPairs()

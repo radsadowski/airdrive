@@ -122,6 +122,16 @@ func (e *SyncEngine) reconcile(ctx context.Context, pair index.SyncPair, opts Re
 		return nil
 	}
 
+	totalCopies := 0
+	for _, s := range steps {
+		if s.Kind == syncdelta.CopyAToB || s.Kind == syncdelta.CopyBToA {
+			if s.Src.Kind != string(provider.FileKindDir) {
+				totalCopies++
+			}
+		}
+	}
+	e.emitProgress(pair.ID, pair.Name, "syncing", outcome{}, 0, totalCopies, 0, 0)
+
 	out := e.apply(ctx, pair, steps)
 	if err := e.refreshAfterWrites(ctx, pair, steps); err != nil {
 		e.logger.Warn("sync: post-apply refresh failed, state may lag one pass", "pair", pair.ID, "err", err)
@@ -130,6 +140,7 @@ func (e *SyncEngine) reconcile(ctx context.Context, pair index.SyncPair, opts Re
 		e.logger.Warn("sync: record state", "pair", pair.ID, "err", err)
 	}
 	e.recordStatus(ctx, pair.ID, out)
+	e.emitProgress(pair.ID, pair.Name, "idle", out, 0, 0, 0, 0)
 	e.emitPair(pair.ID)
 	return nil
 }
@@ -215,7 +226,7 @@ func (e *SyncEngine) apply(ctx context.Context, pair index.SyncPair, steps []syn
 		batches = append(batches, batchID)
 	}
 
-	if jobs, err := e.waitForBatches(ctx, batches); err != nil || jobs > 0 {
+	if jobs, err := e.waitForBatches(ctx, batches, pair); err != nil || jobs > 0 {
 		out.failed += jobs
 		out.copied -= jobs
 	}
@@ -288,34 +299,41 @@ func (e *SyncEngine) findChildDir(ctx context.Context, locationID, parentID, nam
 }
 
 // waitForBatches polls until every enqueued batch completes and returns the
-// number of failed jobs.
-func (e *SyncEngine) waitForBatches(ctx context.Context, batchIDs []string) (int, error) {
+// number of failed jobs. Each poll cycle forwards a live aggregate to the
+// UI as sync progress, computed across ALL batches at once so counters
+// never jump backwards between batches.
+func (e *SyncEngine) waitForBatches(ctx context.Context, batchIDs []string, pair index.SyncPair) (int, error) {
+	if len(batchIDs) == 0 {
+		return 0, nil
+	}
 	failed := 0
-	for _, batchID := range batchIDs {
-		for {
-			done, total := 0, 0
-			jobs, err := e.db.JobsForBatches(ctx, []string{batchID})
-			if err != nil {
-				return failed, err
-			}
-			for _, j := range jobs {
-				total++
-				switch j.State {
-				case stateDone, stateFailed, stateSkipped, stateCanceled:
-					done++
-					if j.State == stateFailed {
-						failed++
-					}
+	for {
+		done, total := 0, 0
+		var bytesDone, bytesTotal int64
+		jobs, err := e.db.JobsForBatches(ctx, batchIDs)
+		if err != nil {
+			return failed, err
+		}
+		for _, j := range jobs {
+			total++
+			bytesDone += j.BytesDone
+			bytesTotal += j.BytesTotal
+			switch j.State {
+			case stateDone, stateFailed, stateSkipped, stateCanceled:
+				done++
+				if j.State == stateFailed {
+					failed++
 				}
 			}
-			if total == 0 || done == total {
-				break
-			}
-			select {
-			case <-ctx.Done():
-				return failed, ctx.Err()
-			case <-time.After(200 * time.Millisecond):
-			}
+		}
+		e.emitProgress(pair.ID, pair.Name, "syncing", outcome{}, done, total, bytesDone, bytesTotal)
+		if total == 0 || done == total {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			return failed, ctx.Err()
+		case <-time.After(200 * time.Millisecond):
 		}
 	}
 	return failed, nil
@@ -504,6 +522,25 @@ func (e *SyncEngine) recordStatus(ctx context.Context, pairID string, out outcom
 	if err := e.db.UpdateSyncPairStatus(ctx, pairID, time.Now().UTC().Format(time.RFC3339), string(blob), out.lastErr); err != nil {
 		e.logger.Warn("sync: write status", "pair", pairID, "err", err)
 	}
+}
+
+// emitProgress notifies the UI about one running pass with live aggregates.
+func (e *SyncEngine) emitProgress(pairID, name, state string, out outcome, filesDone, filesTotal int, bytesDone, bytesTotal int64) {
+	if e.emit == nil {
+		return
+	}
+	e.emit(ev.SyncProgress, map[string]any{
+		"pairId":     pairID,
+		"name":       name,
+		"state":      state,
+		"filesDone":  filesDone,
+		"filesTotal": filesTotal,
+		"bytesDone":  bytesDone,
+		"bytesTotal": bytesTotal,
+		"copied":     out.copied,
+		"deleted":    out.deleted,
+		"failed":     out.failed,
+	})
 }
 
 // emitPair notifies the UI about a completed pass when an emitter is wired.

@@ -15,4 +15,5 @@ const (
 	TransferBatchDone = "transfer:batchDone"
 	ToastShow         = "toast:show"
 	SyncUpdated       = "sync:updated"
+	SyncProgress      = "sync:progress"
 )

@@ -476,6 +476,22 @@ class MockClient implements ApiClient {
     await sleep(400)
     const srcMap = this.state.subtreeMap(srcLocId, srcRoot || null)
     const dstMap = this.state.subtreeMap(dstLocId, dstRoot || null)
+    let totalBytes = 0
+    for (const [, n] of srcMap) {
+      if (!dstMap.has(n.name) && n.kind === 'file') totalBytes += n.size
+    }
+    bus.emit('sync:progress', {
+      pairId: pair.id,
+      name: pair.name,
+      state: 'syncing',
+      filesDone: 0,
+      filesTotal: srcMap.size,
+      bytesDone: 0,
+      bytesTotal: totalBytes,
+      copied: 0,
+      deleted: 0,
+      failed: 0,
+    })
     let copied = 0
     for (const [path, node] of srcMap) {
       if (dstMap.has(path)) continue
@@ -504,6 +520,18 @@ class MockClient implements ApiClient {
     pair.lastCounts = JSON.stringify({ copied, deleted: 0, skipped: 0, failed: 0 })
     this.refreshCounts(dstLocId)
     this.touch(dstLocId, dstRoot || null)
+    bus.emit('sync:progress', {
+      pairId: pair.id,
+      name: pair.name,
+      state: 'idle',
+      filesDone: 0,
+      filesTotal: 0,
+      bytesDone: 0,
+      bytesTotal: 0,
+      copied,
+      deleted: 0,
+      failed: 0,
+    })
     bus.emit('sync:updated', { pairId: pair.id, state: 'idle' })
     this.toast(`Sync complete: ${pair.name}`, `${copied} copied`, 'success')
   }

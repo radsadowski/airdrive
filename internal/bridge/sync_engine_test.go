@@ -245,3 +245,47 @@ func TestWhenSyncNowRunsThroughTheService(t *testing.T) {
 	}
 	t.Fatal("sync now never produced the file at B")
 }
+
+// evRec captures emitted engine events in order.
+type evRec struct {
+	events []map[string]any
+	names  []string
+}
+
+func (r *evRec) record(name string, payload map[string]any) {
+	r.names = append(r.names, name)
+	r.events = append(r.events, payload)
+}
+
+func TestWhenAPassRunsThenProgressEventsBracketItWithLiveCounts(t *testing.T) {
+	t.Parallel()
+	e := newSyncE2E(t)
+	rec := &evRec{}
+	e.engine.emit = rec.record
+	e.mustWrite(e.rootA, "a.txt", "one")
+	e.mustWrite(e.rootA, "b.txt", "two")
+	pairID := e.mustPair(directionAToB, 0b11)
+
+	e.run(pairID, ReconcileOpts{Backfill: true})
+
+	var progress []map[string]any
+	for i, name := range rec.names {
+		if name == "sync:progress" {
+			progress = append(progress, rec.events[i])
+		}
+	}
+	e.r.GreaterOrEqual(len(progress), 2, "at least a start and a finish event")
+	first := progress[0]
+	e.r.Equal("syncing", first["state"])
+	e.r.Equal(2, first["filesTotal"])
+	last := progress[len(progress)-1]
+	e.r.Equal("idle", last["state"])
+	e.r.GreaterOrEqual(last["copied"], 2)
+	e.r.Equal(pairID, last["pairId"])
+	e.r.NotEmpty(last["name"])
+
+	for _, p := range progress[:len(progress)-1] {
+		e.r.Equal("syncing", p["state"])
+		e.r.LessOrEqual(p["filesDone"].(int), p["filesTotal"].(int))
+	}
+}
