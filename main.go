@@ -68,7 +68,11 @@ func main() {
 	// Watcher is created before the app so it can be passed into services.
 	// The onChange callback emits fs:changed via the app: set after New.
 	var appRef *application.App
+	var syncSched *bridge.SyncScheduler
 	w, err := watcher.New(db, logger, func(locationID, dirID string) {
+		if syncSched != nil {
+			syncSched.NotifyFileEvent(locationID)
+		}
 		if appRef != nil {
 			var dirVal any
 			if dirID != "" {
@@ -121,6 +125,9 @@ func main() {
 		app.Event.Emit(name, payload)
 	})
 	syncSvc.SetReconcile(syncEngine.ReconcileHook())
+	syncSched = bridge.NewSyncScheduler(db, syncEngine.ReconcileHook(), logger)
+	syncSched.Start()
+	defer syncSched.Stop()
 
 	app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:  "AirDrive",
