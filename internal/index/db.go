@@ -48,7 +48,14 @@ func Open(path string, logger *slog.Logger) (*DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, probeErr := db.Exec("SELECT md5 FROM files LIMIT 0"); probeErr != nil {
+	drifted := false
+	for _, probe := range []string{"SELECT md5 FROM files LIMIT 0", "SELECT actions FROM sync_pairs LIMIT 0"} {
+		if _, probeErr := db.Exec(probe); probeErr != nil {
+			drifted = true
+			break
+		}
+	}
+	if drifted {
 		logger.Warn("index: schema drift detected, rebuilding index", "path", path)
 		_ = db.Close()
 		for _, suffix := range []string{"", "-wal", "-shm"} {
@@ -749,4 +756,165 @@ func scanFileRow(s scanner) (provider.FileInfo, error) {
 	f.Kind = provider.FileKind(kind)
 	f.ModifiedAt, _ = time.Parse(time.RFC3339, modAt)
 	return f, nil
+}
+
+// ---- Sync pairs ------------------------------------------------------------ //
+
+// SyncPair is one sync policy row between two location folders.
+type SyncPair struct {
+	ID         string
+	Name       string
+	LocationA  string
+	PathA      string
+	LocationB  string
+	PathB      string
+	Direction  string // a_to_b | b_to_a | both
+	Actions    int    // bitmask: 1=created, 2=modified, 4=deleted
+	Paused     bool
+	LastRunAt  string
+	LastError  string
+	LastCounts string // JSON summary of the last reconcile
+	CreatedAt  string
+}
+
+const syncPairCols = "id,name,location_a,path_a,location_b,path_b,direction,actions,paused,last_run_at,last_error,last_counts,created_at"
+
+// CreateSyncPair inserts a new pair row.
+func (d *DB) CreateSyncPair(ctx context.Context, p SyncPair) error {
+	_, err := d.db.ExecContext(ctx,
+		`INSERT INTO sync_pairs(id,name,location_a,path_a,location_b,path_b,direction,actions,paused)
+		 VALUES (?,?,?,?,?,?,?,?,?)`,
+		p.ID, p.Name, p.LocationA, p.PathA, p.LocationB, p.PathB, p.Direction, p.Actions, p.Paused,
+	)
+	return err
+}
+
+// scanPairs scans full sync_pairs rows ordered by creation.
+func (d *DB) scanPairs(rows *sql.Rows) ([]SyncPair, error) {
+	defer rows.Close()
+	var out []SyncPair
+	for rows.Next() {
+		var p SyncPair
+		var actions int
+		var paused int
+		if err := rows.Scan(&p.ID, &p.Name, &p.LocationA, &p.PathA, &p.LocationB, &p.PathB,
+			&p.Direction, &actions, &paused, &p.LastRunAt, &p.LastError, &p.LastCounts, &p.CreatedAt); err != nil {
+			return nil, err
+		}
+		p.Actions = actions
+		p.Paused = paused != 0
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
+// ListSyncPairs returns every pair ordered by creation.
+func (d *DB) ListSyncPairs(ctx context.Context) ([]SyncPair, error) {
+	rows, err := d.db.QueryContext(ctx, `SELECT `+syncPairCols+` FROM sync_pairs ORDER BY created_at`)
+	if err != nil {
+		return nil, err
+	}
+	return d.scanPairs(rows)
+}
+
+// GetSyncPair returns one pair or sql.ErrNoRows.
+func (d *DB) GetSyncPair(ctx context.Context, id string) (SyncPair, error) {
+	rows, err := d.db.QueryContext(ctx, `SELECT `+syncPairCols+` FROM sync_pairs WHERE id=?`, id)
+	if err != nil {
+		return SyncPair{}, err
+	}
+	pairs, err := d.scanPairs(rows)
+	if err != nil {
+		return SyncPair{}, err
+	}
+	if len(pairs) == 0 {
+		return SyncPair{}, sql.ErrNoRows
+	}
+	return pairs[0], nil
+}
+
+// UpdateSyncPair rewrites the user-editable pair fields; status and
+// created_at are preserved.
+func (d *DB) UpdateSyncPair(ctx context.Context, p SyncPair) error {
+	_, err := d.db.ExecContext(ctx,
+		`UPDATE sync_pairs SET name=?, path_a=?, path_b=?, direction=?, actions=?, paused=? WHERE id=?`,
+		p.Name, p.PathA, p.PathB, p.Direction, p.Actions, p.Paused, p.ID,
+	)
+	return err
+}
+
+// DeleteSyncPair removes the pair and its sync_state rows.
+func (d *DB) DeleteSyncPair(ctx context.Context, id string) error {
+	if _, err := d.db.ExecContext(ctx, `DELETE FROM sync_state WHERE pair_id=?`, id); err != nil {
+		return err
+	}
+	_, err := d.db.ExecContext(ctx, `DELETE FROM sync_pairs WHERE id=?`, id)
+	return err
+}
+
+// UpdateSyncPairStatus records the outcome of the last reconcile. countsJSON
+// and errText are mutually exclusive: an error clears the counts.
+func (d *DB) UpdateSyncPairStatus(ctx context.Context, id, runAt, countsJSON, errText string) error {
+	if errText != "" {
+		countsJSON = ""
+	}
+	_, err := d.db.ExecContext(ctx,
+		`UPDATE sync_pairs SET last_run_at=?, last_counts=?, last_error=? WHERE id=?`,
+		runAt, countsJSON, errText, id,
+	)
+	return err
+}
+
+// SyncState is the per-path record of what a pair has synced so far.
+type SyncState struct {
+	PairID       string
+	Path         string
+	IDA          string
+	IDB          string
+	LastEtagA    string
+	LastEtagB    string
+	LastMtimeA   string
+	LastMtimeB   string
+	LastSyncedAt string
+}
+
+// UpsertSyncState records or replaces one path's state.
+func (d *DB) UpsertSyncState(ctx context.Context, s SyncState) error {
+	_, err := d.db.ExecContext(ctx,
+		`INSERT INTO sync_state(pair_id,path,id_a,id_b,last_etag_a,last_etag_b,last_mtime_a,last_mtime_b,last_synced_at)
+		 VALUES (?,?,?,?,?,?,?,?,?)
+		 ON CONFLICT(pair_id,path) DO UPDATE SET id_a=excluded.id_a, id_b=excluded.id_b,
+		   last_etag_a=excluded.last_etag_a, last_etag_b=excluded.last_etag_b,
+		   last_mtime_a=excluded.last_mtime_a, last_mtime_b=excluded.last_mtime_b,
+		   last_synced_at=excluded.last_synced_at`,
+		s.PairID, s.Path, s.IDA, s.IDB, s.LastEtagA, s.LastEtagB, s.LastMtimeA, s.LastMtimeB, s.LastSyncedAt,
+	)
+	return err
+}
+
+// DeleteSyncState drops one path's record (e.g. after both sides are gone).
+func (d *DB) DeleteSyncState(ctx context.Context, pairID, path string) error {
+	_, err := d.db.ExecContext(ctx, `DELETE FROM sync_state WHERE pair_id=? AND path=?`, pairID, path)
+	return err
+}
+
+// SyncStateRows returns every state row for a pair.
+func (d *DB) SyncStateRows(ctx context.Context, pairID string) ([]SyncState, error) {
+	rows, err := d.db.QueryContext(ctx,
+		`SELECT pair_id,path,id_a,id_b,last_etag_a,last_etag_b,last_mtime_a,last_mtime_b,last_synced_at
+		 FROM sync_state WHERE pair_id=? ORDER BY path`, pairID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []SyncState
+	for rows.Next() {
+		var s SyncState
+		if err := rows.Scan(&s.PairID, &s.Path, &s.IDA, &s.IDB,
+			&s.LastEtagA, &s.LastEtagB, &s.LastMtimeA, &s.LastMtimeB, &s.LastSyncedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, s)
+	}
+	return out, rows.Err()
 }

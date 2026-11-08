@@ -88,6 +88,7 @@ func main() {
 	appSvc := bridge.NewAppService(nil)
 	locSvc := bridge.NewLocationService(nil, db, registry, w, logger)
 	fileSvc := bridge.NewFileService(nil, db, registry, logger)
+	syncSvc := bridge.NewSyncService(db, registry, logger)
 
 	app := application.New(application.Options{
 		Name:        "AirDrive",
@@ -97,6 +98,7 @@ func main() {
 			application.NewService(locSvc),
 			application.NewService(fileSvc),
 			application.NewService(transfers),
+			application.NewService(syncSvc),
 			application.NewService(settingsSvc),
 		},
 		Assets: application.AssetOptions{

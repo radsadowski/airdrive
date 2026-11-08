@@ -3,6 +3,7 @@ package entities
 import (
 	"time"
 
+	"github.com/radosny/airdrive/internal/index"
 	"github.com/radosny/airdrive/internal/provider"
 )
 
@@ -29,4 +30,38 @@ func ToPage(page provider.ListPage) Page {
 		items = append(items, ToFile(f))
 	}
 	return Page{Items: items, Cursor: page.Cursor}
+}
+
+// ToEntitySyncPair converts an index.SyncPair row to its frontend entity type.
+func ToEntitySyncPair(p index.SyncPair) SyncPair {
+	return SyncPair{
+		ID:         p.ID,
+		Name:       p.Name,
+		LocationA:  p.LocationA,
+		PathA:      p.PathA,
+		LocationB:  p.LocationB,
+		PathB:      p.PathB,
+		Direction:  p.Direction,
+		Actions:    p.Actions,
+		Paused:     p.Paused,
+		LastRunAt:  p.LastRunAt,
+		LastError:  p.LastError,
+		LastCounts: p.LastCounts,
+		CreatedAt:  p.CreatedAt,
+	}
+}
+
+// FromEntitySyncPair converts a frontend SyncPair to its index row form.
+func FromEntitySyncPair(p SyncPair) index.SyncPair {
+	return index.SyncPair{
+		ID:        p.ID,
+		Name:      p.Name,
+		LocationA: p.LocationA,
+		PathA:     p.PathA,
+		LocationB: p.LocationB,
+		PathB:     p.PathB,
+		Direction: p.Direction,
+		Actions:   p.Actions,
+		Paused:    p.Paused,
+	}
 }

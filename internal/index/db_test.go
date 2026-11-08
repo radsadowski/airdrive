@@ -407,3 +407,131 @@ func TestWhenSearchFiltersOutEverythingThenAnEmptyPageReturns(t *testing.T) {
 	r.NoError(err)
 	r.Empty(page.Items)
 }
+
+func TestWhenASyncPairIsCreatedThenItRoundTrips(t *testing.T) {
+	t.Parallel()
+	r := require.New(t)
+	db := openTestDB(t)
+	ctx := context.Background()
+
+	pair := SyncPair{
+		ID: "P1", Name: "photos backup", LocationA: "L1", PathA: "/pics",
+		LocationB: "L2", PathB: "backups/", Direction: "a_to_b", Actions: 3,
+	}
+	r.NoError(db.CreateSyncPair(ctx, pair))
+
+	pairs, err := db.ListSyncPairs(ctx)
+	r.NoError(err)
+	r.Len(pairs, 1)
+	got := pairs[0]
+	r.NotEmpty(got.CreatedAt, "created_at is server-stamped")
+	got.CreatedAt = ""
+	r.Equal(pair, got, "every writable field must round-trip")
+}
+
+func TestWhenASyncPairIsUpdatedThenTheEditableFieldsChange(t *testing.T) {
+	t.Parallel()
+	r := require.New(t)
+	db := openTestDB(t)
+	ctx := context.Background()
+
+	r.NoError(db.CreateSyncPair(ctx, SyncPair{ID: "P1", LocationA: "L1", LocationB: "L2", Direction: "both", Actions: 3}))
+	r.NoError(db.UpdateSyncPair(ctx, SyncPair{ID: "P1", Name: "mirror", LocationA: "L1", LocationB: "L2", Direction: "b_to_a", Actions: 7, Paused: true}))
+
+	pair, err := db.GetSyncPair(ctx, "P1")
+	r.NoError(err)
+	r.Equal("mirror", pair.Name)
+	r.Equal("b_to_a", pair.Direction)
+	r.Equal(7, pair.Actions)
+	r.True(pair.Paused)
+	r.NotEmpty(pair.CreatedAt, "created_at must survive updates")
+}
+
+func TestWhenASyncPairIsDeletedThenItsSyncStateIsCascaded(t *testing.T) {
+	t.Parallel()
+	r := require.New(t)
+	db := openTestDB(t)
+	ctx := context.Background()
+
+	r.NoError(db.CreateSyncPair(ctx, SyncPair{ID: "P1", LocationA: "L1", LocationB: "L2", Direction: "both", Actions: 3}))
+	r.NoError(db.UpsertSyncState(ctx, SyncState{PairID: "P1", Path: "a/jpg", IDA: "A1", IDB: "B1"}))
+	r.NoError(db.DeleteSyncPair(ctx, "P1"))
+
+	rows, err := db.SyncStateRows(ctx, "P1")
+	r.NoError(err)
+	r.Empty(rows, "state rows must go away with their pair")
+}
+
+func TestWhenSyncStateIsUpsertedThenPerPathRowsRoundTrip(t *testing.T) {
+	t.Parallel()
+	r := require.New(t)
+	db := openTestDB(t)
+	ctx := context.Background()
+	r.NoError(db.CreateSyncPair(ctx, SyncPair{ID: "P1", LocationA: "L1", LocationB: "L2", Direction: "both", Actions: 3}))
+
+	r.NoError(db.UpsertSyncState(ctx, SyncState{PairID: "P1", Path: "a.jpg", IDA: "A1", IDB: "B1", LastEtagA: "ea", LastEtagB: "eb", LastSyncedAt: "t1"}))
+	r.NoError(db.UpsertSyncState(ctx, SyncState{PairID: "P1", Path: "b.jpg", IDA: "A2", IDB: "B2"}))
+	r.NoError(db.UpsertSyncState(ctx, SyncState{PairID: "P1", Path: "a.jpg", IDA: "A1", IDB: "B1", LastEtagA: "ea2", LastSyncedAt: "t2"}))
+
+	rows, err := db.SyncStateRows(ctx, "P1")
+	r.NoError(err)
+	r.Len(rows, 2, "the second upsert of the same path must replace, not append")
+	byPath := map[string]SyncState{}
+	for _, row := range rows {
+		byPath[row.Path] = row
+	}
+	r.Equal("ea2", byPath["a.jpg"].LastEtagA)
+	r.Equal("t2", byPath["a.jpg"].LastSyncedAt)
+}
+
+func TestWhenPairStatusIsWrittenThenItPersists(t *testing.T) {
+	t.Parallel()
+	r := require.New(t)
+	db := openTestDB(t)
+	ctx := context.Background()
+	r.NoError(db.CreateSyncPair(ctx, SyncPair{ID: "P1", LocationA: "L1", LocationB: "L2", Direction: "both", Actions: 3}))
+
+	r.NoError(db.UpdateSyncPairStatus(ctx, "P1", "2026-11-08T10:00:00Z", `{"copied":3,"deleted":1}`, ""))
+	pair, err := db.GetSyncPair(ctx, "P1")
+	r.NoError(err)
+	r.Equal("2026-11-08T10:00:00Z", pair.LastRunAt)
+	r.Equal(`{"copied":3,"deleted":1}`, pair.LastCounts)
+	r.Empty(pair.LastError)
+
+	r.NoError(db.UpdateSyncPairStatus(ctx, "P1", "2026-11-08T11:00:00Z", "", "drive quota exceeded"))
+	pair, err = db.GetSyncPair(ctx, "P1")
+	r.NoError(err)
+	r.Equal("drive quota exceeded", pair.LastError)
+	r.Empty(pair.LastCounts, "an error status must clear the counts")
+}
+
+func TestWhenTheDatabasePredatesTheNewSyncPairsSchemaThenOpenRebuildsIt(t *testing.T) {
+	t.Parallel()
+	r := require.New(t)
+	path := filepath.Join(t.TempDir(), "test.db")
+
+	legacy, err := sql.Open("sqlite", path)
+	r.NoError(err)
+	_, err = legacy.Exec(`
+		CREATE TABLE goose_db_version (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			version_id INTEGER NOT NULL,
+			is_applied INTEGER NOT NULL,
+			tstamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		);
+		INSERT INTO goose_db_version (version_id, is_applied) VALUES (1, 1);
+		CREATE TABLE sync_pairs (
+			id TEXT PRIMARY KEY, location_a TEXT NOT NULL, path_a TEXT NOT NULL DEFAULT '',
+			location_b TEXT NOT NULL, path_b TEXT NOT NULL DEFAULT '', direction TEXT NOT NULL DEFAULT 'both'
+		);
+	`)
+	r.NoError(err)
+	r.NoError(legacy.Close())
+
+	db, err := Open(path, nil)
+	r.NoError(err)
+	t.Cleanup(func() { db.Close() })
+
+	err = db.CreateSyncPair(context.Background(), SyncPair{ID: "P1", LocationA: "L1", LocationB: "L2", Direction: "both", Actions: 3})
+	r.NoError(err, "an old DB must be dropped and rebuilt with the new schema")
+}

@@ -92,23 +92,35 @@ CREATE TABLE transfer_batches (
     created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
 );
 
--- v2-ready sync tables (schema present from day one, unused until Phase v2).
+-- Sync tables: pair = one policy between two location folders,
+-- state = per-path knowledge of what was synced already.
 CREATE TABLE sync_pairs (
     id          TEXT PRIMARY KEY,
+    name        TEXT NOT NULL DEFAULT '',
     location_a  TEXT NOT NULL,
     path_a      TEXT NOT NULL DEFAULT '',
     location_b  TEXT NOT NULL,
     path_b      TEXT NOT NULL DEFAULT '',
-    direction   TEXT NOT NULL DEFAULT 'both'
+    direction   TEXT NOT NULL DEFAULT 'both', -- a_to_b | b_to_a | both
+    actions     INTEGER NOT NULL DEFAULT 3,    -- bitmask: 1=created, 2=modified, 4=deleted
+    paused      INTEGER NOT NULL DEFAULT 0,
+    last_run_at TEXT NOT NULL DEFAULT '',
+    last_error  TEXT NOT NULL DEFAULT '',
+    last_counts TEXT NOT NULL DEFAULT '',       -- JSON summary of the last reconcile
+    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
 );
 
 CREATE TABLE sync_state (
-    pair_id           TEXT NOT NULL,
-    file_id           TEXT NOT NULL,
+    pair_id           TEXT NOT NULL REFERENCES sync_pairs(id) ON DELETE CASCADE,
+    path              TEXT NOT NULL,             -- path relative to the paired roots
+    id_a              TEXT NOT NULL DEFAULT '',
+    id_b              TEXT NOT NULL DEFAULT '',
     last_etag_a       TEXT NOT NULL DEFAULT '',
     last_etag_b       TEXT NOT NULL DEFAULT '',
+    last_mtime_a      TEXT NOT NULL DEFAULT '',
+    last_mtime_b      TEXT NOT NULL DEFAULT '',
     last_synced_at    TEXT NOT NULL DEFAULT '',
-    PRIMARY KEY (pair_id, file_id)
+    PRIMARY KEY (pair_id, path)
 );
 
 -- +goose Down

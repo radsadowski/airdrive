@@ -93,3 +93,20 @@ type Settings struct {
 	ShowHiddenFiles     bool   `json:"showHiddenFiles"`
 	DownloadDir         string `json:"downloadDir"`
 }
+
+// SyncPair is the UI-facing projection of one sync policy row.
+type SyncPair struct {
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	LocationA  string `json:"locationA"`
+	PathA      string `json:"pathA"`
+	LocationB  string `json:"locationB"`
+	PathB      string `json:"pathB"`
+	Direction  string `json:"direction"` // a_to_b | b_to_a | both
+	Actions    int    `json:"actions"`
+	Paused     bool   `json:"paused"`
+	LastRunAt  string `json:"lastRunAt,omitempty"`
+	LastError  string `json:"lastError,omitempty"`
+	LastCounts string `json:"lastCounts,omitempty"`
+	CreatedAt  string `json:"createdAt"`
+}
