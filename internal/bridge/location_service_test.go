@@ -3,6 +3,7 @@ package bridge
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -263,6 +264,9 @@ func wireGdrive(t *testing.T, svc *LocationService, d *gdriveDeps) *gdriveDeps {
 		return auth.GdriveToken{}, d.loadTokenErr
 	}
 	svc.newGdriveProvider = func(context.Context, string, *slog.Logger) (provider.StorageProvider, error) {
+		if d.loadTokenErr != nil {
+			return nil, fmt.Errorf("gdrive provider: load token: %w", d.loadTokenErr)
+		}
 		if d.providerErr != nil {
 			return nil, d.providerErr
 		}

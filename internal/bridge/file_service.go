@@ -159,7 +159,9 @@ func (s *FileService) DeleteFiles(locationID string, fileIDs []string) error {
 		return fmt.Errorf("delete: %w", err)
 	}
 	for _, id := range fileIDs {
-		_ = s.db.DeleteFile(context.Background(), locationID, id)
+		if dErr := s.db.DeleteTree(context.Background(), locationID, id); dErr != nil {
+			s.logger.Warn("delete file from index", "location", locationID, "id", id, "err", dErr)
+		}
 	}
 	for parent := range parents {
 		s.emitFsChanged(locationID, parent)

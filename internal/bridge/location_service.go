@@ -56,10 +56,26 @@ type LocationService struct {
 	mu             sync.Mutex
 	gdriveSessions map[string]*gdriveSession
 	now            func() time.Time
+	// statuses remembers the last state pushed per location, so a UI that
+	// loads after a failed restore still sees the error instead of "idle".
+	statuses map[string]locationStatus
+}
+
+// locationStatus is the last state reported for a location.
+type locationStatus struct {
+	state  string
+	errMsg string
 }
 
 // gdriveSessionTTL bounds how long a sign-in can browse before confirming.
 const gdriveSessionTTL = 10 * time.Minute
+
+// Location states reported to the UI.
+const (
+	locationStateIdle     = "idle"
+	locationStateIndexing = "indexing"
+	locationStateError    = "error"
+)
 
 // gdriveSession is the in-memory sign-in state between connect and confirm.
 type gdriveSession struct {
@@ -78,6 +94,7 @@ func NewLocationService(app *application.App, db *index.DB, registry *provider.R
 		emit:     func(string, ...any) {},
 
 		gdriveSessions: map[string]*gdriveSession{},
+		statuses:       map[string]locationStatus{},
 		now:            time.Now,
 	}
 	s.doSignIn = func(ctx context.Context, openBrowser func(string) error) (auth.SignInResult, error) {
@@ -98,6 +115,7 @@ func NewLocationService(app *application.App, db *index.DB, registry *provider.R
 	s.saveCreds = auth.SaveCredentials
 	s.loadCreds = auth.LoadCredentials
 	s.deleteCreds = auth.DeleteCredentials
+	registry.SetLoader(s.providerFor)
 	return s
 }
 
@@ -118,14 +136,16 @@ func (s *LocationService) ListLocations() ([]entities.Location, error) {
 	out := make([]entities.Location, 0, len(locs))
 	for _, l := range locs {
 		count, size, _ := s.db.CountFiles(ctx, l.ID)
+		state, errMsg := s.status(l.ID)
 		out = append(out, entities.Location{
 			ID:        l.ID,
 			Kind:      string(l.Kind),
 			Name:      l.Name,
 			Root:      l.Root,
-			Status:    "idle",
+			Status:    state,
 			FileCount: count,
 			TotalSize: size,
+			Error:     errMsg,
 		})
 	}
 	return out, nil
@@ -183,6 +203,9 @@ func (s *LocationService) RefreshLocation(locationID string) error {
 func (s *LocationService) RemoveLocation(locationID string) error {
 	s.registry.Unregister(locationID)
 	s.watcher.Unwatch(locationID)
+	s.mu.Lock()
+	delete(s.statuses, locationID)
+	s.mu.Unlock()
 	if err := auth.DeleteToken(locationID); err != nil {
 		// Not fatal: the location row is the source of truth; a stray
 		// Keychain item is harmless clutter, not a correctness bug.
@@ -195,7 +218,7 @@ func (s *LocationService) RemoveLocation(locationID string) error {
 // cursor persists only on success, so an interrupted full walk re-walks
 // from scratch: never a partial resume.
 func (s *LocationService) crawl(locationID string, p provider.StorageProvider) {
-	s.emitLocationStatus(locationID, "indexing", "")
+	s.emitLocationStatus(locationID, locationStateIndexing, "")
 	var done int64
 	reconciler, _ := p.(provider.Reconciler)
 	reconcile := reconciler != nil && reconciler.Reconciles()
@@ -238,7 +261,7 @@ func (s *LocationService) crawl(locationID string, p provider.StorageProvider) {
 	})
 	if err != nil {
 		s.logger.Error("crawl failed", "location", locationID, "err", err)
-		s.emitLocationStatus(locationID, "error", err.Error())
+		s.emitLocationStatus(locationID, locationStateError, err.Error())
 		return
 	}
 
@@ -261,7 +284,7 @@ func (s *LocationService) crawl(locationID string, p provider.StorageProvider) {
 	count, size, _ := s.db.CountFiles(context.Background(), locationID)
 	s.emit(ev.LocationStatus, map[string]any{
 		"locationId":   locationID,
-		"state":        "idle",
+		"state":        locationStateIdle,
 		"fileCount":    count,
 		"totalSize":    size,
 		"lastSyncedAt": time.Now().UTC().Format(time.RFC3339),
@@ -273,11 +296,25 @@ func (s *LocationService) crawl(locationID string, p provider.StorageProvider) {
 }
 
 func (s *LocationService) emitLocationStatus(locationID, state, errMsg string) {
+	s.mu.Lock()
+	s.statuses[locationID] = locationStatus{state: state, errMsg: errMsg}
+	s.mu.Unlock()
 	s.emit(ev.LocationStatus, map[string]any{
 		"locationId": locationID,
 		"state":      state,
 		"error":      errMsg,
 	})
+}
+
+// status returns the last state reported for a location, defaulting to idle.
+func (s *LocationService) status(locationID string) (string, string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	st, ok := s.statuses[locationID]
+	if !ok {
+		return locationStateIdle, ""
+	}
+	return st.state, st.errMsg
 }
 
 // ---- Google Drive connect / restore -------------------------------------- //
@@ -595,9 +632,10 @@ func (s *LocationService) realNewS3Provider(ctx context.Context, locationID stri
 	}, creds, logger)
 }
 
-// Restore re-registers providers for all persisted locations and runs a
-// cheap incremental sync for gdrive locations; localfs freshness comes from
-// the watcher. Called once at app startup.
+// Restore registers a provider for every persisted location and starts an
+// incremental crawl for remote ones; localfs freshness comes from the watcher.
+// A location whose provider cannot be built is reported as an error and is
+// repaired lazily by providerFor on first use.
 func (s *LocationService) Restore() error {
 	ctx := context.Background()
 	locs, err := s.db.AllLocations(ctx)
@@ -605,46 +643,70 @@ func (s *LocationService) Restore() error {
 		return fmt.Errorf("restore locations: %w", err)
 	}
 	for _, l := range locs {
-		switch l.Kind {
-		case provider.KindLocalFS:
-			s.registry.Register(l.ID, localfs.New(l.ID, l.Root))
-			if wErr := s.watcher.Watch(l.ID, l.Root); wErr != nil {
-				s.logger.Warn("restore watcher", "id", l.ID, "err", wErr)
-			}
-			s.logger.Info("restored location", "id", l.ID, "root", l.Root)
-		case provider.KindGDrive:
-			if _, lErr := s.loadToken(l.ID); lErr != nil {
-				s.logger.Warn("restore gdrive: credentials missing", "id", l.ID, "err", lErr)
-				s.emitLocationStatus(l.ID, "error", "Google account credentials are missing: remove and re-connect the location")
-				continue
-			}
-			p, pErr := s.newGdriveProvider(ctx, l.ID, s.logger)
-			if pErr != nil {
-				s.logger.Warn("restore gdrive: provider", "id", l.ID, "err", pErr)
-				s.emitLocationStatus(l.ID, "error", pErr.Error())
-				continue
-			}
-			s.registry.Register(l.ID, p)
-			go s.crawl(l.ID, p) // incremental via stored cursor
-			s.logger.Info("restored gdrive location", "id", l.ID, "name", l.Name)
-		case provider.KindS3:
-			if _, cErr := s.loadCreds(l.ID); cErr != nil {
-				s.logger.Warn("restore s3: credentials missing", "id", l.ID, "err", cErr)
-				s.emitLocationStatus(l.ID, "error", "S3 credentials are missing: remove and re-connect the location")
-				continue
-			}
-			s3p, s3Err := s.newS3Provider(ctx, l.ID, s.logger)
-			if s3Err != nil {
-				s.logger.Warn("restore s3: provider", "id", l.ID, "err", s3Err)
-				s.emitLocationStatus(l.ID, "error", s3Err.Error())
-				continue
-			}
-			s.registry.Register(l.ID, s3p)
-			go s.crawl(l.ID, s3p)
-			s.logger.Info("restored s3 location", "id", l.ID, "bucket", l.Root)
-		default:
-			s.logger.Warn("restore: unknown location kind", "id", l.ID, "kind", l.Kind)
+		p, pErr := s.buildProvider(ctx, l)
+		if pErr != nil {
+			s.logger.Warn("restore location", "id", l.ID, "kind", l.Kind, "err", pErr)
+			s.emitLocationStatus(l.ID, locationStateError, connectHint(l.Kind, pErr))
+			continue
 		}
+		s.registry.Register(l.ID, p)
+		if l.Kind != provider.KindLocalFS {
+			go s.crawl(l.ID, p) // incremental via the stored cursor
+		}
+		s.logger.Info("restored location", "id", l.ID, "kind", l.Kind, "root", l.Root)
 	}
 	return nil
+}
+
+// buildProvider constructs the provider for a persisted location. Restore and
+// the registry's lazy fallback both go through it, so they cannot drift apart.
+func (s *LocationService) buildProvider(ctx context.Context, loc index.Location) (provider.StorageProvider, error) {
+	switch loc.Kind {
+	case provider.KindLocalFS:
+		if s.watcher != nil {
+			if err := s.watcher.Watch(loc.ID, loc.Root); err != nil {
+				s.logger.Warn("watcher start", "id", loc.ID, "err", err)
+			}
+		}
+		return localfs.New(loc.ID, loc.Root), nil
+	case provider.KindGDrive:
+		return s.newGdriveProvider(ctx, loc.ID, s.logger)
+	case provider.KindS3:
+		return s.newS3Provider(ctx, loc.ID, s.logger)
+	default:
+		return nil, fmt.Errorf("unknown location kind %q", loc.Kind)
+	}
+}
+
+// providerFor returns the provider for a persisted location, building and
+// registering it when an earlier restore attempt failed. The registry calls it
+// lazily, so one failed startup no longer disables the location until relaunch.
+func (s *LocationService) providerFor(ctx context.Context, locationID string) (provider.StorageProvider, error) {
+	loc, err := s.db.LocationByID(ctx, locationID)
+	if err != nil {
+		return nil, fmt.Errorf("location %q: %w", locationID, err)
+	}
+	p, err := s.buildProvider(ctx, loc)
+	if err != nil {
+		s.emitLocationStatus(loc.ID, locationStateError, connectHint(loc.Kind, err))
+		return nil, fmt.Errorf("%s is not connected: %w", loc.Name, err)
+	}
+	s.registry.Register(loc.ID, p)
+	if loc.Kind != provider.KindLocalFS {
+		go s.crawl(loc.ID, p) //nolint:gosec // the crawl outlives the RPC that triggered the rebuild
+	}
+	return p, nil
+}
+
+// connectHint turns a provider construction failure into the message the
+// sidebar shows, so a disconnected location reads as something to act on.
+func connectHint(kind provider.Kind, err error) string {
+	switch kind {
+	case provider.KindGDrive:
+		return "Google Drive is not connected: " + err.Error() + ". Reconnect the location if this keeps happening."
+	case provider.KindS3:
+		return "The bucket is not reachable: " + err.Error() + ". Reconnect the location if this keeps happening."
+	default:
+		return err.Error()
+	}
 }

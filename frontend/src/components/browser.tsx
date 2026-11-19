@@ -39,9 +39,14 @@ const ROW_H = 34
 
 function FileContextMenu({ file, children }: { file: FileInfo; children: React.ReactNode }) {
   const inspect = useUiStore((s) => s.inspect)
+  const selectForMenu = () => {
+    if (!useAppStore.getState().selection.includes(file.id)) {
+      useAppStore.getState().setSelection([file.id], file.id)
+    }
+  }
   return (
     <ContextMenu>
-      <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
+      <ContextMenuTrigger asChild onContextMenu={selectForMenu}>{children}</ContextMenuTrigger>
       <ContextMenuContent>
         <ContextMenuLabel>{file.name}</ContextMenuLabel>
         {file.kind === 'file' && (

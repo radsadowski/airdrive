@@ -329,6 +329,20 @@ func (d *DB) DeleteChildrenOf(ctx context.Context, locationID, dirPath string) e
 	return err
 }
 
+// DeleteTree removes a file and every descendant of it in one pass, so a
+// directory deleted through a provider cannot leave orphaned rows behind.
+func (d *DB) DeleteTree(ctx context.Context, locationID, fileID string) error {
+	_, err := d.db.ExecContext(ctx, `
+		WITH RECURSIVE subtree(id) AS (
+			SELECT id FROM files WHERE location_id=? AND id=?
+			UNION
+			SELECT f.id FROM files f JOIN subtree s ON f.parent_id = s.id WHERE f.location_id=?
+		)
+		DELETE FROM files WHERE location_id=? AND id IN (SELECT id FROM subtree)`,
+		locationID, fileID, locationID, locationID)
+	return err
+}
+
 // FileByID returns a single file of a location or sql.ErrNoRows.
 func (d *DB) FileByID(ctx context.Context, locationID, fileID string) (provider.FileInfo, error) {
 	row := d.db.QueryRowContext(ctx,
