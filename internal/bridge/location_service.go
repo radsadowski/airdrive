@@ -284,6 +284,7 @@ func (s *LocationService) crawl(locationID string, p provider.StorageProvider) {
 	}
 
 	count, size, _ := s.db.CountFiles(context.Background(), locationID)
+	s.recordLocationStatus(locationID, locationStateIdle, "")
 	s.emit(ev.LocationStatus, map[string]any{
 		"locationId":   locationID,
 		"state":        locationStateIdle,
@@ -298,14 +299,20 @@ func (s *LocationService) crawl(locationID string, p provider.StorageProvider) {
 }
 
 func (s *LocationService) emitLocationStatus(locationID, state, errMsg string) {
-	s.mu.Lock()
-	s.statuses[locationID] = locationStatus{state: state, errMsg: errMsg}
-	s.mu.Unlock()
+	s.recordLocationStatus(locationID, state, errMsg)
 	s.emit(ev.LocationStatus, map[string]any{
 		"locationId": locationID,
 		"state":      state,
 		"error":      errMsg,
 	})
+}
+
+// recordLocationStatus remembers the last state so ListLocations can report it
+// after a UI reload, not only while the event is on the wire.
+func (s *LocationService) recordLocationStatus(locationID, state, errMsg string) {
+	s.mu.Lock()
+	s.statuses[locationID] = locationStatus{state: state, errMsg: errMsg}
+	s.mu.Unlock()
 }
 
 // status returns the last state reported for a location, defaulting to idle.

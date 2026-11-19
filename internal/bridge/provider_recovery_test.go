@@ -144,3 +144,21 @@ func TestWhenTheProviderFailsForAnotherReasonThenHealthDoesNotAskForAuth(t *test
 	r.False(h.Connected)
 	r.False(h.NeedsAuth)
 }
+
+func TestWhenACrawlCompletesThenListLocationsReportsIdle(t *testing.T) {
+	t.Parallel()
+	r := require.New(t)
+	svc, db, rec := openService(t)
+
+	seedLocation(t, db, index.Location{ID: "L1", Kind: provider.KindGDrive, Name: "Drive", Root: "My Drive"})
+	deps := wireGdrive(t, svc, &gdriveDeps{})
+	syncScript(deps.provider, "CURSOR", nil, nil)
+
+	r.NoError(svc.Restore())
+	waitIdle(t, rec)
+
+	locs, err := svc.ListLocations()
+	r.NoError(err)
+	r.Len(locs, 1)
+	r.Equal("idle", locs[0].Status, "a finished crawl must not keep reporting indexing after a reload")
+}
