@@ -541,6 +541,25 @@ func (s *LocationService) ReconnectGdrive(locationID string) (*entities.Location
 	}, nil
 }
 
+// LocationHealth reports whether a location's provider is usable right now and,
+// when it is not, whether the user has to sign in again. Navigating to a dead
+// location calls it, so the reconnect prompt needs no manual check.
+func (s *LocationService) LocationHealth(locationID string) (*entities.LocationHealth, error) {
+	ctx := context.Background()
+	loc, err := s.db.LocationByID(ctx, locationID)
+	if err != nil {
+		return nil, fmt.Errorf("location health: %w", err)
+	}
+	if _, err := s.registry.Get(locationID); err != nil {
+		return &entities.LocationHealth{
+			Connected: false,
+			NeedsAuth: loc.Kind == provider.KindGDrive && strings.Contains(err.Error(), "invalid_grant"),
+			Error:     connectHint(loc.Kind, err),
+		}, nil
+	}
+	return &entities.LocationHealth{Connected: true}, nil
+}
+
 // session returns a live sign-in session or an expiry error.
 func (s *LocationService) session(sessionID string) (*gdriveSession, error) {
 	s.mu.Lock()

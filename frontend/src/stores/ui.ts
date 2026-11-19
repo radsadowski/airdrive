@@ -18,6 +18,8 @@ interface UiState {
   transferPicker: { action: 'copy' | 'move'; fileIds: string[] } | null
   /** in-app clipboard for ⌘C/⌘X/⌘V */
   clipboard: { mode: 'copy' | 'cut'; fileIds: string[]; sourceLocationId: string } | null
+  /** auto-opened prompt for a location whose credentials must be renewed */
+  reconnectPrompt: { locationId: string; name: string; error: string } | null
 
   pushToast: (t: Omit<ToastPayload, 'id'>) => void
   dismissToast: (id: string) => void
@@ -33,9 +35,13 @@ interface UiState {
   patchSettings: (patch: Partial<Settings>) => Promise<void>
   setTransferPicker: (p: { action: 'copy' | 'move'; fileIds: string[] } | null) => void
   setClipboard: (c: UiState['clipboard']) => void
+  promptReconnect: (p: { locationId: string; name: string; error: string }) => void
+  dismissReconnect: () => void
+  resolveReconnect: (locationId: string) => void
 }
 
 let toastSeq = 0
+const reconnectPrompted = new Set<string>()
 
 export const useUiStore = create<UiState>((set, get) => ({
   toasts: [],
@@ -56,6 +62,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   },
   transferPicker: null,
   clipboard: null,
+  reconnectPrompt: null,
 
   pushToast(t) {
     const id = `toast_${Date.now()}_${toastSeq++}`
@@ -115,6 +122,21 @@ export const useUiStore = create<UiState>((set, get) => ({
 
   setClipboard(c) {
     set({ clipboard: c })
+  },
+
+  promptReconnect(p) {
+    if (reconnectPrompted.has(p.locationId)) return
+    reconnectPrompted.add(p.locationId)
+    set({ reconnectPrompt: p })
+  },
+
+  dismissReconnect() {
+    set({ reconnectPrompt: null })
+  },
+
+  resolveReconnect(locationId) {
+    reconnectPrompted.delete(locationId)
+    set({ reconnectPrompt: null })
   },
 }))
 

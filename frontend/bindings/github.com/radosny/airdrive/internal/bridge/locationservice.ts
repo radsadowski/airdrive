@@ -80,6 +80,17 @@ export function ListLocations(): $CancellablePromise<entities$0.Location[]> {
 }
 
 /**
+ * LocationHealth reports whether a location's provider is usable right now and,
+ * when it is not, whether the user has to sign in again. Navigating to a dead
+ * location calls it, so the reconnect prompt needs no manual check.
+ */
+export function LocationHealth(locationID: string): $CancellablePromise<entities$0.LocationHealth | null> {
+    return $Call.ByID(2716029942, locationID).then(($result: any) => {
+        return $$createType8($result);
+    });
+}
+
+/**
  * ReconnectGdrive replaces the stored sign-in of an existing Drive location, so
  * an expired or revoked refresh token can be renewed without losing the
  * location id, its index, its sync cursor, or the sync pairs that reference it.
@@ -140,7 +151,7 @@ export function StarredGdriveFolders(sessionID: string): $CancellablePromise<ent
  */
 export function TestS3Connection(cfg: entities$0.S3Config): $CancellablePromise<entities$0.S3TestResult | null> {
     return $Call.ByID(2390044261, cfg).then(($result: any) => {
-        return $$createType8($result);
+        return $$createType10($result);
     });
 }
 
@@ -152,5 +163,7 @@ const $$createType3 = $Create.Array($$createType2);
 const $$createType4 = entities$0.GdriveSession.createFrom;
 const $$createType5 = $Create.Nullable($$createType4);
 const $$createType6 = $Create.Array($$createType0);
-const $$createType7 = entities$0.S3TestResult.createFrom;
+const $$createType7 = entities$0.LocationHealth.createFrom;
 const $$createType8 = $Create.Nullable($$createType7);
+const $$createType9 = entities$0.S3TestResult.createFrom;
+const $$createType10 = $Create.Nullable($$createType9);

@@ -7,6 +7,7 @@ export {
     GdriveSession,
     ListDirOpts,
     Location,
+    LocationHealth,
     Page,
     S3Config,
     S3TestResult,

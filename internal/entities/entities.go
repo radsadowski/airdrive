@@ -111,3 +111,11 @@ type SyncPair struct {
 	Backfill   bool   `json:"backfill"` // transient create-time hint, not persisted
 	CreatedAt  string `json:"createdAt"`
 }
+
+// LocationHealth is the connectivity verdict for a location, used by the UI to
+// offer a reconnect when its credentials stopped working.
+type LocationHealth struct {
+	Connected bool   `json:"connected"`
+	NeedsAuth bool   `json:"needsAuth"`
+	Error     string `json:"error,omitempty"`
+}

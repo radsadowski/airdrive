@@ -40,6 +40,14 @@ export interface Location {
   error?: string
 }
 
+/** connectivity verdict for a location, probed when it is opened */
+export interface LocationHealth {
+  connected: boolean
+  /** the provider is up but the stored credentials must be renewed */
+  needsAuth: boolean
+  error?: string
+}
+
 export interface S3LocationConfig {
   preset: 'r2' | 'b2' | 'minio' | 'aws'
   endpoint: string
@@ -305,6 +313,8 @@ export interface ApiClient {
   confirmGdriveLocation(sessionId: string, folderId: string | null): Promise<Location>
   /** re-run Google sign-in for an existing location, keeping its id and index */
   reconnectGdrive(locationId: string): Promise<Location>
+  /** connectivity probe used when a location is opened, so a dead token surfaces immediately */
+  checkLocation(locationId: string): Promise<LocationHealth>
   addS3Location(cfg: S3LocationConfig): Promise<Location>
   removeLocation(locationId: string): Promise<void>
   refreshLocation(locationId: string): Promise<void>

@@ -5,13 +5,13 @@
  */
 
 import { Events } from '@wailsio/runtime'
-import type { ApiClient, AppEventMap, AppEventName, EventBus, FileInfo, GdriveSession, Location, Page, S3LocationConfig, Settings } from '../contract'
+import type { ApiClient, AppEventMap, AppEventName, EventBus, FileInfo, GdriveSession, Location, LocationHealth, Page, S3LocationConfig, Settings } from '../contract'
 import * as LocSvc from '@bindings/github.com/radosny/airdrive/internal/bridge/locationservice'
 import * as FileSvc from '@bindings/github.com/radosny/airdrive/internal/bridge/fileservice'
 import * as XferSvc from '@bindings/github.com/radosny/airdrive/internal/bridge/transferservice'
 import * as SettingsSvc from '@bindings/github.com/radosny/airdrive/internal/bridge/settingsservice'
 import * as SyncSvc from '@bindings/github.com/radosny/airdrive/internal/bridge/syncservice'
-import type { File as EntityFile, Location as EntityLocation, Page as EntityPage, SyncPair as EntitySyncPair } from '@bindings/github.com/radosny/airdrive/internal/entities/models'
+import type { File as EntityFile, Location as EntityLocation, LocationHealth as EntityLocationHealth, Page as EntityPage, SyncPair as EntitySyncPair } from '@bindings/github.com/radosny/airdrive/internal/entities/models'
 import type { SyncPair } from '../contract'
 
 // ---- shape adapters ------------------------------------------------------ //
@@ -33,6 +33,14 @@ function toLocation(loc: EntityLocation): Location {
     totalSize: loc.totalSize,
     lastSyncedAt: loc.lastSyncedAt || null,
     error: loc.error,
+  }
+}
+
+function toLocationHealth(h: EntityLocationHealth): LocationHealth {
+  return {
+    connected: h.connected,
+    needsAuth: h.needsAuth,
+    error: h.error || undefined,
   }
 }
 
@@ -156,6 +164,11 @@ class WailsClientImpl implements ApiClient, EventBus {
   async reconnectGdrive(locationId: string): Promise<Location> {
     const loc = await LocSvc.ReconnectGdrive(locationId)
     return toLocation(requireNonNull(loc, 'reconnectGdrive'))
+  }
+
+  async checkLocation(locationId: string): Promise<LocationHealth> {
+    const health = await LocSvc.LocationHealth(locationId)
+    return toLocationHealth(requireNonNull(health, 'checkLocation'))
   }
 
   async addS3Location(cfg: S3LocationConfig): Promise<Location> {

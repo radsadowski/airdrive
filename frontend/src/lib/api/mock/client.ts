@@ -11,6 +11,7 @@ import type {
   FileInfo,
   GdriveSession,
   Location,
+  LocationHealth,
   S3LocationConfig,
   Settings,
   TransferBatch,
@@ -202,6 +203,16 @@ class MockClient implements ApiClient {
     loc.status = 'idle'
     loc.error = undefined
     return { ...loc }
+  }
+
+  async checkLocation(locationId: string): Promise<LocationHealth> {
+    const loc = this.state.locations.get(locationId)
+    if (!loc) throw new ApiError('not-found', 'location not found', false)
+    await this.net(loc.kind, 120)
+    if (loc.kind === 'gdrive' && loc.status === 'error') {
+      return { connected: false, needsAuth: true, error: loc.error ?? 'Google Drive sign-in has expired' }
+    }
+    return { connected: true, needsAuth: false }
   }
 
   async addS3Location(cfg: S3LocationConfig): Promise<Location> {

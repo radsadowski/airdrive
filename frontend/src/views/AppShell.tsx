@@ -3,6 +3,7 @@ import { useAppStore } from '@/stores/app'
 import { useTransfersStore } from '@/stores/transfers'
 import { useUiStore } from '@/stores/ui'
 import { copyOrCutSelection, pasteIntoCurrentDir, trashSelection, uploadDroppedFiles } from '@/lib/actions'
+import { api } from '@/lib/api'
 import { Sidebar } from '@/components/sidebar'
 import { TitleBar } from '@/components/titlebar'
 import { Toolbar } from '@/components/toolbar'
@@ -16,6 +17,7 @@ import { SettingsDialog } from '@/components/settings'
 import { SyncActivityBar } from '@/components/sync-bar'
 import { SyncPanel } from '@/components/sync'
 import { PromptDialog } from '@/components/prompt'
+import { ReconnectPrompt } from '@/components/reconnect-prompt'
 import { Toasts } from '@/components/toasts'
 import { DevPanel } from '@/components/devpanel'
 import { Onboarding } from '@/components/onboarding'
@@ -122,6 +124,27 @@ export function AppShell() {
     void useUiStore.getState().loadSettings()
   }, [])
 
+  /* probe the opened location so a dead sign-in is offered before any file op */
+  useEffect(() => {
+    if (!currentLocationId) return
+    let alive = true
+    void api
+      .checkLocation(currentLocationId)
+      .then((health) => {
+        if (!alive || health.connected || !health.needsAuth) return
+        const loc = useAppStore.getState().locations.find((l) => l.id === currentLocationId)
+        useUiStore.getState().promptReconnect({
+          locationId: currentLocationId,
+          name: loc?.name ?? currentLocationId,
+          error: health.error ?? '',
+        })
+      })
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [currentLocationId])
+
   return (
     <div
       className="relative flex h-full w-full flex-col overflow-hidden bg-base"
@@ -164,6 +187,7 @@ export function AppShell() {
       <SettingsDialog />
       <SyncPanel />
       <PromptDialog />
+      <ReconnectPrompt />
       <Toasts />
       <DevPanel />
     </div>

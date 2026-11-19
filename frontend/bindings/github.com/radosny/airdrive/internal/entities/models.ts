@@ -221,6 +221,36 @@ export class Location {
 }
 
 /**
+ * LocationHealth is the connectivity verdict for a location, used by the UI to
+ * offer a reconnect when its credentials stopped working.
+ */
+export class LocationHealth {
+    "connected": boolean;
+    "needsAuth": boolean;
+    "error"?: string;
+
+    /** Creates a new LocationHealth instance. */
+    constructor($$source: Partial<LocationHealth> = {}) {
+        if (!("connected" in $$source)) {
+            this["connected"] = false;
+        }
+        if (!("needsAuth" in $$source)) {
+            this["needsAuth"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new LocationHealth instance from a string or object.
+     */
+    static createFrom($$source: any = {}): LocationHealth {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new LocationHealth($$parsedSource as Partial<LocationHealth>);
+    }
+}
+
+/**
  * Page is a paginated result with an opaque cursor.
  */
 export class Page {
