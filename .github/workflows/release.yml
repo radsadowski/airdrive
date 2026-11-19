@@ -42,6 +42,16 @@ jobs:
       - name: Install create-dmg
         run: brew install create-dmg
 
+      - name: Compute app version
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            APP_VERSION="${GITHUB_REF_NAME#v}"
+          else
+            APP_VERSION="0.0.0-nightly.$(date -u +%Y%m%d).$(printf '%s' "${GITHUB_SHA}" | cut -c1-7)"
+          fi
+          echo "APP_VERSION=${APP_VERSION}" >> "$GITHUB_ENV"
+          echo "Building AirDrive ${APP_VERSION}"
+
       # Builds frontend assets, compiles the Go binary with the production
       # build tag, creates bin/AirDrive.app, and ad-hoc signs it.
       - name: Build and package the app (wails3 package)

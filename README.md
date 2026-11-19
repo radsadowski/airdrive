@@ -238,7 +238,13 @@ wails3 package
 ```
 
 Builds the frontend, compiles the production binary, and packages an
-ad-hoc signed app bundle at `bin/AirDrive.app`. The release workflow wraps
+ad-hoc signed app bundle at `bin/AirDrive.app`. The build stamps a version
+into the binary (`-X ...internal/version.Version`), defaulting to
+`git describe --tags --always --dirty`; override it with
+`APP_VERSION=1.2.3 wails3 package`. The same value lands in the version
+chip in the title bar and in the bundle's `Info.plist`. The release
+workflow passes the git tag with its `v` stripped, so a `v0.3.0` release
+reports `v0.3.0`. The release workflow wraps
 that in a `.dmg` (`create-dmg`) and publishes it to GitHub Releases: every
 push to `master` refreshes the `nightly` pre-release, and every `v*.*.*`
 tag creates a stable release and updates the Homebrew tap.

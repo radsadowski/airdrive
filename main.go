@@ -13,6 +13,7 @@ import (
 	ev "github.com/radosny/airdrive/internal/events"
 	"github.com/radosny/airdrive/internal/index"
 	"github.com/radosny/airdrive/internal/provider"
+	"github.com/radosny/airdrive/internal/version"
 	"github.com/radosny/airdrive/internal/watcher"
 )
 
@@ -153,7 +154,7 @@ func main() {
 	}()
 
 	app.Event.Emit(ev.AppReady, map[string]any{
-		"version":  "0.1.0",
+		"version":  version.Version,
 		"mode":     "wails",
 		"platform": "darwin",
 	})

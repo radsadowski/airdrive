@@ -11,6 +11,13 @@ import { useEffect, useState } from 'react'
 
 const TIMEOUT_MS = 1500
 
+const SEMVER = /^\d+\.\d+/
+
+/** Prefixes release versions with v, leaves labels like dev or browser mock alone. */
+function displayVersion(version: string): string {
+  return SEMVER.test(version) ? `v${version}` : version
+}
+
 export type BackendPresence = 'wails' | 'browser'
 
 export function useBackendVersion(): { version: string; presence: BackendPresence | 'unknown' } {
@@ -25,10 +32,10 @@ export function useBackendVersion(): { version: string; presence: BackendPresenc
     import('@bindings/github.com/radosny/airdrive/internal/bridge/appservice')
       .then((bindings) => Promise.race([bindings.Version(), timeout]))
       .then((version) => {
-        if (alive) setState({ version: `v${version} · wails`, presence: 'wails' })
+        if (alive) setState({ version: `${displayVersion(version)} · wails`, presence: 'wails' })
       })
       .catch(() => {
-        if (alive) setState({ version: 'v0.1 · browser mock', presence: 'browser' })
+        if (alive) setState({ version: 'browser mock', presence: 'browser' })
       })
     return () => {
       alive = false

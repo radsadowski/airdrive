@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
+
+	"github.com/radosny/airdrive/internal/version"
 )
 
 // AppService is the shell-level Wails service: app metadata, not storage API.
@@ -18,8 +20,8 @@ func NewAppService(app *application.App) *AppService {
 // SetApp injects the app reference after application.New returns.
 func (s *AppService) SetApp(app *application.App) { s.app = app }
 
-// Version returns the backend version.
-func (s *AppService) Version() string { return "0.1.0" }
+// Version returns the backend version stamped into the binary at build time.
+func (s *AppService) Version() string { return version.Version }
 
 // Platform returns the OS the backend is running on.
 func (s *AppService) Platform() string { return "darwin" }
