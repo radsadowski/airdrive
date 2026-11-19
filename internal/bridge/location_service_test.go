@@ -272,6 +272,12 @@ func wireGdrive(t *testing.T, svc *LocationService, d *gdriveDeps) *gdriveDeps {
 		}
 		return d.provider, nil
 	}
+	svc.newGdriveProviderWith = func(context.Context, string, auth.GdriveToken, *slog.Logger) (provider.StorageProvider, error) {
+		if d.providerErr != nil {
+			return nil, d.providerErr
+		}
+		return d.provider, nil
+	}
 	svc.newGdriveBrowser = func(context.Context, oauth2.TokenSource) (gdrive.BrowseClient, error) {
 		return d.browser, nil
 	}

@@ -303,6 +303,8 @@ export interface ApiClient {
   starredGdriveFolders(sessionId: string): Promise<FileInfo[]>
   /** phase 2b: create the location rooted at the picked folder (null = whole Drive) */
   confirmGdriveLocation(sessionId: string, folderId: string | null): Promise<Location>
+  /** re-run Google sign-in for an existing location, keeping its id and index */
+  reconnectGdrive(locationId: string): Promise<Location>
   addS3Location(cfg: S3LocationConfig): Promise<Location>
   removeLocation(locationId: string): Promise<void>
   refreshLocation(locationId: string): Promise<void>

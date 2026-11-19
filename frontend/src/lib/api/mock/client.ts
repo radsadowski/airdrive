@@ -194,6 +194,16 @@ class MockClient implements ApiClient {
     return { ...loc }
   }
 
+  async reconnectGdrive(locationId: string): Promise<Location> {
+    const loc = this.state.locations.get(locationId)
+    if (!loc) throw new ApiError('not-found', 'location not found', false)
+    if (loc.kind !== 'gdrive') throw new ApiError('invalid', 'not a Google Drive location', false)
+    await this.net('gdrive', 900)
+    loc.status = 'idle'
+    loc.error = undefined
+    return { ...loc }
+  }
+
   async addS3Location(cfg: S3LocationConfig): Promise<Location> {
     await this.net('s3', 800)
     const preset: (typeof PRESETS)[number] = {

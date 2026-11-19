@@ -153,6 +153,11 @@ class WailsClientImpl implements ApiClient, EventBus {
     return toLocation(requireNonNull(loc, 'confirmGdriveLocation'))
   }
 
+  async reconnectGdrive(locationId: string): Promise<Location> {
+    const loc = await LocSvc.ReconnectGdrive(locationId)
+    return toLocation(requireNonNull(loc, 'reconnectGdrive'))
+  }
+
   async addS3Location(cfg: S3LocationConfig): Promise<Location> {
     const loc = await LocSvc.AddS3Location(cfg)
     return toLocation(requireNonNull(loc, 'addS3Location'))

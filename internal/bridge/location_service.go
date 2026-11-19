@@ -39,19 +39,20 @@ type LocationService struct {
 	emit func(name string, data ...any)
 
 	// DI seams with production defaults, overridden in tests.
-	openBrowser       func(url string) error
-	doSignIn          func(ctx context.Context, openBrowser func(string) error) (auth.SignInResult, error)
-	fetchAccount      func(ctx context.Context, ts oauth2.TokenSource) (auth.AccountInfo, error)
-	saveToken         func(locationID string, tok auth.GdriveToken) error
-	loadToken         func(locationID string) (auth.GdriveToken, error)
-	deleteToken       func(locationID string) error
-	newGdriveProvider func(ctx context.Context, locationID string, logger *slog.Logger) (provider.StorageProvider, error)
-	newGdriveBrowser  func(ctx context.Context, ts oauth2.TokenSource) (gdrive.BrowseClient, error)
-	newS3Client       func(cfg entities.S3Config) (s3compat.BucketLister, error)
-	newS3Provider     func(ctx context.Context, locationID string, logger *slog.Logger) (provider.StorageProvider, error)
-	saveCreds         func(locationID string, data []byte) error
-	loadCreds         func(locationID string) ([]byte, error)
-	deleteCreds       func(locationID string) error
+	openBrowser           func(url string) error
+	doSignIn              func(ctx context.Context, openBrowser func(string) error) (auth.SignInResult, error)
+	fetchAccount          func(ctx context.Context, ts oauth2.TokenSource) (auth.AccountInfo, error)
+	saveToken             func(locationID string, tok auth.GdriveToken) error
+	loadToken             func(locationID string) (auth.GdriveToken, error)
+	deleteToken           func(locationID string) error
+	newGdriveProvider     func(ctx context.Context, locationID string, logger *slog.Logger) (provider.StorageProvider, error)
+	newGdriveProviderWith func(ctx context.Context, locationID string, tok auth.GdriveToken, logger *slog.Logger) (provider.StorageProvider, error)
+	newGdriveBrowser      func(ctx context.Context, ts oauth2.TokenSource) (gdrive.BrowseClient, error)
+	newS3Client           func(cfg entities.S3Config) (s3compat.BucketLister, error)
+	newS3Provider         func(ctx context.Context, locationID string, logger *slog.Logger) (provider.StorageProvider, error)
+	saveCreds             func(locationID string, data []byte) error
+	loadCreds             func(locationID string) ([]byte, error)
+	deleteCreds           func(locationID string) error
 
 	mu             sync.Mutex
 	gdriveSessions map[string]*gdriveSession
@@ -105,6 +106,7 @@ func NewLocationService(app *application.App, db *index.DB, registry *provider.R
 	s.loadToken = auth.LoadToken
 	s.deleteToken = auth.DeleteToken
 	s.newGdriveProvider = s.realNewGdriveProvider
+	s.newGdriveProviderWith = s.buildGdriveWith
 	s.newGdriveBrowser = func(ctx context.Context, ts oauth2.TokenSource) (gdrive.BrowseClient, error) {
 		return gdrive.NewBrowseClient(ctx, ts)
 	}
@@ -326,6 +328,12 @@ func (s *LocationService) realNewGdriveProvider(ctx context.Context, locationID 
 	if err != nil {
 		return nil, fmt.Errorf("gdrive provider: load token: %w", err)
 	}
+	return s.newGdriveProviderWith(ctx, locationID, tok, logger)
+}
+
+// buildGdriveWith constructs a Drive provider from an explicit token, so a
+// reconnect can validate the new sign-in before it replaces the stored token.
+func (s *LocationService) buildGdriveWith(ctx context.Context, locationID string, tok auth.GdriveToken, logger *slog.Logger) (provider.StorageProvider, error) {
 	rootID, err := s.db.GetGdriveRootID(ctx, locationID)
 	if err != nil {
 		s.logger.Warn("gdrive provider: read sync root", "id", locationID, "err", err)
@@ -489,7 +497,47 @@ func (s *LocationService) ConfirmGdriveLocation(sessionID, folderID string) (*en
 		Kind:   string(provider.KindGDrive),
 		Name:   name,
 		Root:   rootDisplay,
-		Status: "indexing",
+		Status: locationStateIndexing,
+	}, nil
+}
+
+// ReconnectGdrive replaces the stored sign-in of an existing Drive location, so
+// an expired or revoked refresh token can be renewed without losing the
+// location id, its index, its sync cursor, or the sync pairs that reference it.
+func (s *LocationService) ReconnectGdrive(locationID string) (*entities.Location, error) {
+	ctx := context.Background()
+	loc, err := s.db.LocationByID(ctx, locationID)
+	if err != nil {
+		return nil, fmt.Errorf("reconnect gdrive: %w", err)
+	}
+	if loc.Kind != provider.KindGDrive {
+		return nil, fmt.Errorf("reconnect gdrive: location %q is %s, not gdrive", locationID, loc.Kind)
+	}
+	if s.openBrowser == nil {
+		return nil, errors.New("gdrive reconnect: browser not wired (app not set)")
+	}
+	result, err := s.doSignIn(ctx, s.openBrowser)
+	if err != nil {
+		return nil, fmt.Errorf("google sign-in: %w", err)
+	}
+	p, err := s.newGdriveProviderWith(ctx, loc.ID, result.Token, s.logger)
+	if err != nil {
+		return nil, fmt.Errorf("reconnect gdrive: %w", err)
+	}
+	if err := s.saveToken(loc.ID, result.Token); err != nil {
+		return nil, fmt.Errorf("reconnect gdrive: save token: %w", err)
+	}
+	s.registry.Register(loc.ID, p)
+	s.emitLocationStatus(loc.ID, locationStateIndexing, "")
+	go s.crawl(loc.ID, p) //nolint:gosec // the crawl outlives the sign-in request
+
+	s.logger.Info("gdrive location reconnected", "location", loc.ID, "name", loc.Name)
+	return &entities.Location{
+		ID:     loc.ID,
+		Kind:   string(loc.Kind),
+		Name:   loc.Name,
+		Root:   loc.Root,
+		Status: locationStateIndexing,
 	}, nil
 }
 
@@ -703,6 +751,9 @@ func (s *LocationService) providerFor(ctx context.Context, locationID string) (p
 func connectHint(kind provider.Kind, err error) string {
 	switch kind {
 	case provider.KindGDrive:
+		if strings.Contains(err.Error(), "invalid_grant") {
+			return "Google Drive sign-in has expired. Reconnect the location to sign in again."
+		}
 		return "Google Drive is not connected: " + err.Error() + ". Reconnect the location if this keeps happening."
 	case provider.KindS3:
 		return "The bucket is not reachable: " + err.Error() + ". Reconnect the location if this keeps happening."

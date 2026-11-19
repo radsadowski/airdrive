@@ -80,6 +80,17 @@ export function ListLocations(): $CancellablePromise<entities$0.Location[]> {
 }
 
 /**
+ * ReconnectGdrive replaces the stored sign-in of an existing Drive location, so
+ * an expired or revoked refresh token can be renewed without losing the
+ * location id, its index, its sync cursor, or the sync pairs that reference it.
+ */
+export function ReconnectGdrive(locationID: string): $CancellablePromise<entities$0.Location | null> {
+    return $Call.ByID(3169129411, locationID).then(($result: any) => {
+        return $$createType1($result);
+    });
+}
+
+/**
  * RefreshLocation triggers a background re-crawl of a location, re-indexing
  * any files that have changed since the last crawl.
  */
@@ -95,9 +106,10 @@ export function RemoveLocation(locationID: string): $CancellablePromise<void> {
 }
 
 /**
- * Restore re-registers providers for all persisted locations and runs a
- * cheap incremental sync for gdrive locations; localfs freshness comes from
- * the watcher. Called once at app startup.
+ * Restore registers a provider for every persisted location and starts an
+ * incremental crawl for remote ones; localfs freshness comes from the watcher.
+ * A location whose provider cannot be built is reported as an error and is
+ * repaired lazily by providerFor on first use.
  */
 export function Restore(): $CancellablePromise<void> {
     return $Call.ByID(4058141903);

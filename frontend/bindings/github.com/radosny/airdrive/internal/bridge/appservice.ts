@@ -37,7 +37,7 @@ export function SetApp(app: application$0.App | null): $CancellablePromise<void>
 }
 
 /**
- * Version returns the backend version.
+ * Version returns the backend version stamped into the binary at build time.
  */
 export function Version(): $CancellablePromise<string> {
     return $Call.ByID(969414119);

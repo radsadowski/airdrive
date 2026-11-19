@@ -1,4 +1,4 @@
-import { HardDrive, Plus, RefreshCw, Settings2, Cloud, Globe, Loader2, X, PanelLeft, ArrowLeftRight } from 'lucide-react'
+import { HardDrive, Plus, RefreshCw, Settings2, Cloud, Globe, Loader2, X, PanelLeft, ArrowLeftRight, LogIn } from 'lucide-react'
 import { useState } from 'react'
 import type { Location, ProviderKind } from '@/lib/api/contract'
 import { useAppStore } from '@/stores/app'
@@ -38,6 +38,7 @@ function LocationRow({ loc, collapsed }: { loc: Location; collapsed: boolean }) 
   const crawl = useAppStore((s) => s.crawlProgress[loc.id])
   const [dropTarget, setDropTarget] = useState(false)
   const [removing, setRemoving] = useState(false)
+  const [reconnecting, setReconnecting] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const meta = KIND_META[loc.kind]
   const Icon = loc.status === 'indexing' || loc.status === 'syncing' ? Loader2 : meta.icon
@@ -62,6 +63,18 @@ function LocationRow({ loc, collapsed }: { loc: Location; collapsed: boolean }) 
       toastError(e)
     } finally {
       setRemoving(false)
+    }
+  }
+
+  const handleReconnect = async () => {
+    setReconnecting(true)
+    try {
+      await api.reconnectGdrive(loc.id)
+      void reloadLocations()
+    } catch (e) {
+      toastError(e)
+    } finally {
+      setReconnecting(false)
     }
   }
 
@@ -188,6 +201,14 @@ function LocationRow({ loc, collapsed }: { loc: Location; collapsed: boolean }) 
     <ContextMenu>
       <ContextMenuTrigger asChild>{row}</ContextMenuTrigger>
       <ContextMenuContent>
+        {loc.kind === 'gdrive' && loc.status === 'error' && (
+          <>
+            <ContextMenuItem disabled={reconnecting} onSelect={() => void handleReconnect()}>
+              <LogIn size={13} /> {reconnecting ? 'Waiting for Google…' : 'Reconnect Google Drive'}
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+          </>
+        )}
         <ContextMenuItem onSelect={() => void api.refreshLocation(loc.id).catch(() => undefined)}>
           <RefreshCw size={13} /> Refresh index
         </ContextMenuItem>
