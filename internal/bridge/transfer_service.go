@@ -1,6 +1,6 @@
 // TransferService: the copy/move/upload engine: enqueues jobs, streams bytes
-// between providers with conflict policies, MD5 verification, throttling, and
-// progress events consumed by the transfers panel.
+// between providers with conflict policies, MD5 verification, and progress
+// events consumed by the transfers panel.
 package bridge
 
 import (

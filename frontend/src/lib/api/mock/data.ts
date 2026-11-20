@@ -341,7 +341,7 @@ const LOREM = [
   'The crawl is resumable: kill it at file 400,000 of a million.',
   'Virtual folders are prefixes wearing a trench coat.',
   'One interface, every storage. The UI never knows the difference.',
-  'Bandwidth throttling keeps the home network usable.',
+  'Concurrency is the only speed knob: more workers, more throughput.',
   'Idempotent conflicts: skip if identical, keep both if unsure.',
   'The contract is one TypeScript file. Drift is a build error.',
 ]

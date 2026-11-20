@@ -15,7 +15,7 @@ export interface TransferEngineDeps {
 }
 
 const TICK_MS = 350
-/** simulated shared link: workers split it, like a real connection */
+/** mock-only pacing so fake transfers animate; the real engine has no bandwidth cap */
 const SIM_LINK_BPS = 10_000_000
 
 export class TransferEngine {
