@@ -187,7 +187,7 @@ func (s *FileService) MoveWithin(locationID string, fileIDs []string, destDirID 
 	var failed atomic.Bool
 	var mu sync.Mutex
 	var firstErr error
-	s.emitOp(opID, opMove, locationID, 0, total, opRunning, targets[0].name, "")
+	s.emitOp(opID, opMove, locationID, 0, total, opRunning, targets[0].path, "")
 
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, fileOpWorkers)
@@ -205,7 +205,7 @@ func (s *FileService) MoveWithin(locationID string, fileIDs []string, destDirID 
 				if firstErr == nil {
 					firstErr = err
 					failed.Store(true)
-					s.emitOp(opID, opMove, locationID, int(done.Load()), total, opError, t.name, err.Error())
+					s.emitOp(opID, opMove, locationID, int(done.Load()), total, opError, t.path, err.Error())
 				}
 				mu.Unlock()
 				return
@@ -220,7 +220,7 @@ func (s *FileService) MoveWithin(locationID string, fileIDs []string, destDirID 
 			}
 			n := int(done.Add(int64(t.count)))
 			if !failed.Load() {
-				s.emitOp(opID, opMove, locationID, n, total, opRunning, t.name, "")
+				s.emitOp(opID, opMove, locationID, n, total, opRunning, t.path, "")
 			}
 		}(t)
 	}
@@ -241,6 +241,7 @@ func (s *FileService) MoveWithin(locationID string, fileIDs []string, destDirID 
 type opTarget struct {
 	id    string
 	name  string
+	path  string
 	count int
 }
 
@@ -252,6 +253,10 @@ func (s *FileService) opTargets(ctx context.Context, locationID string, fileIDs 
 		t := opTarget{id: id, count: 1}
 		if f, err := s.db.FileByID(ctx, locationID, id); err == nil {
 			t.name = f.Name
+			t.path = f.Name
+		}
+		if path, err := s.db.DisplayPath(ctx, locationID, id); err == nil && path != "" {
+			t.path = path
 		}
 		if n, err := s.db.CountSubtree(ctx, locationID, id); err == nil && n > 0 {
 			t.count = n
@@ -291,7 +296,7 @@ func (s *FileService) DeleteFiles(locationID string, fileIDs []string) error {
 	var failed atomic.Bool
 	var mu sync.Mutex
 	var firstErr error
-	s.emitOp(opID, opDelete, locationID, 0, total, opRunning, targets[0].name, "")
+	s.emitOp(opID, opDelete, locationID, 0, total, opRunning, targets[0].path, "")
 
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, fileOpWorkers)
@@ -309,7 +314,7 @@ func (s *FileService) DeleteFiles(locationID string, fileIDs []string) error {
 				if firstErr == nil {
 					firstErr = err
 					failed.Store(true)
-					s.emitOp(opID, opDelete, locationID, int(done.Load()), total, opError, t.name, err.Error())
+					s.emitOp(opID, opDelete, locationID, int(done.Load()), total, opError, t.path, err.Error())
 				}
 				mu.Unlock()
 				return
@@ -319,7 +324,7 @@ func (s *FileService) DeleteFiles(locationID string, fileIDs []string) error {
 			}
 			n := int(done.Add(int64(t.count)))
 			if !failed.Load() {
-				s.emitOp(opID, opDelete, locationID, n, total, opRunning, t.name, "")
+				s.emitOp(opID, opDelete, locationID, n, total, opRunning, t.path, "")
 			}
 		}(t)
 	}
@@ -402,7 +407,7 @@ func (s *FileService) emitFsChanged(locationID, dirID string) {
 }
 
 // emitOp reports progress for a file operation shown in the activity bar.
-func (s *FileService) emitOp(opID, op, locationID string, done, total int, state, current, errMsg string) {
+func (s *FileService) emitOp(opID, op, locationID string, done, total int, state, path, errMsg string) {
 	s.emit(ev.FileOpProgress, map[string]any{
 		"opId":       opID,
 		"op":         op,
@@ -410,7 +415,7 @@ func (s *FileService) emitOp(opID, op, locationID string, done, total int, state
 		"done":       done,
 		"total":      total,
 		"state":      state,
-		"current":    current,
+		"path":       path,
 		"error":      errMsg,
 	})
 }

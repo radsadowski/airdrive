@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAppStore } from '@/stores/app'
 import { useTransfersStore } from '@/stores/transfers'
+import { useSyncStore } from '@/stores/sync'
 import { useUiStore } from '@/stores/ui'
 import { copyOrCutSelection, pasteIntoCurrentDir, trashSelection, uploadDroppedFiles } from '@/lib/actions'
 import { api } from '@/lib/api'
@@ -122,6 +123,7 @@ export function AppShell() {
   useEffect(() => {
     void useTransfersStore.getState().hydrate()
     void useUiStore.getState().loadSettings()
+    void useSyncStore.getState().load()
   }, [])
 
   /* probe the opened location so a dead sign-in is offered before any file op */

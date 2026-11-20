@@ -96,9 +96,21 @@ class MockClient implements ApiClient {
     done: number,
     total: number,
     state: 'running' | 'done' | 'error',
-    current?: string,
+    path?: string,
   ): void {
-    bus.emit('fileop:progress', { opId, op, locationId, done, total, state, current })
+    bus.emit('fileop:progress', { opId, op, locationId, done, total, state, path })
+  }
+
+  private displayPath(id: string): string {
+    const parts: string[] = []
+    let cur: string | null = id
+    let guard = 0
+    while (cur && guard++ < 64) {
+      const n = this.state.node(cur)
+      parts.unshift(n.name)
+      cur = n.parentId
+    }
+    return parts.join('/')
   }
 
   private async net(kind: Location['kind'], baseMs: number): Promise<void> {
@@ -345,7 +357,7 @@ class MockClient implements ApiClient {
     const sizes = fileIds.map((id) => this.subtreeIds(id).length)
     const total = sizes.reduce((a, n) => a + n, 0)
     let done = 0
-    this.emitOp(opId, 'move', locationId, 0, total, 'running', fileIds[0] ? this.state.node(fileIds[0]).name : undefined)
+    this.emitOp(opId, 'move', locationId, 0, total, 'running', fileIds[0] ? this.displayPath(fileIds[0]) : undefined)
     for (const [index, id] of fileIds.entries()) {
       const n = this.state.node(id)
       const oldParent = n.parentId
@@ -364,8 +376,8 @@ class MockClient implements ApiClient {
       else this.state.children.set(key, [id])
       await sleep(90)
       done += sizes[index]
-      const nextName = fileIds[index + 1] ? this.state.node(fileIds[index + 1]).name : n.name
-      this.emitOp(opId, 'move', locationId, done, total, 'running', nextName)
+      const nextPath = fileIds[index + 1] ? this.displayPath(fileIds[index + 1]) : this.displayPath(id)
+      this.emitOp(opId, 'move', locationId, done, total, 'running', nextPath)
     }
     for (const d of touchedOld) this.touch(locationId, d)
     this.touch(locationId, destDirId)
@@ -380,15 +392,15 @@ class MockClient implements ApiClient {
     const sizes = fileIds.map((id) => this.subtreeIds(id).length)
     const total = sizes.reduce((a, n) => a + n, 0)
     let done = 0
-    this.emitOp(opId, 'delete', locationId, 0, total, 'running', fileIds[0] ? this.state.node(fileIds[0]).name : undefined)
+    this.emitOp(opId, 'delete', locationId, 0, total, 'running', fileIds[0] ? this.displayPath(fileIds[0]) : undefined)
     for (const [index, id] of fileIds.entries()) {
       const n = this.state.node(id)
       touchedDirs.add(n.parentId)
       for (const sid of this.subtreeIds(id)) this.state.node(sid).trashed = true
       await sleep(90)
       done += sizes[index]
-      const nextName = fileIds[index + 1] ? this.state.node(fileIds[index + 1]).name : n.name
-      this.emitOp(opId, 'delete', locationId, done, total, 'running', nextName)
+      const nextPath = fileIds[index + 1] ? this.displayPath(fileIds[index + 1]) : this.displayPath(id)
+      this.emitOp(opId, 'delete', locationId, done, total, 'running', nextPath)
     }
     this.emitOp(opId, 'delete', locationId, total, total, 'done')
     for (const d of touchedDirs) this.touch(locationId, d)

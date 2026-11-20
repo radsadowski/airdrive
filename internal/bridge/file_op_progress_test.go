@@ -162,7 +162,7 @@ func TestWhenADirectoryIsDeletedThenProgressReportsTheWholeSubtree(t *testing.T)
 	events := rec.snapshot()
 	r.Len(events, 3, "start, one step for the renamed subtree, done")
 	r.Equal(4, events[0]["total"], "the folder plus its three children")
-	r.Equal("d1", events[0]["current"])
+	r.Equal("d1", events[0]["path"])
 	r.Equal(4, events[1]["done"])
 	r.Equal(opDone, events[2]["state"])
 }

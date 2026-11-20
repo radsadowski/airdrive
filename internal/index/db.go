@@ -358,6 +358,34 @@ func (d *DB) CountSubtree(ctx context.Context, locationID, fileID string) (int, 
 	return n, err
 }
 
+// DisplayPath returns the root-relative path of a file, built from indexed
+// names, so progress rows show where an operation is happening.
+func (d *DB) DisplayPath(ctx context.Context, locationID, fileID string) (string, error) {
+	rows, err := d.db.QueryContext(ctx, `
+		WITH RECURSIVE chain(id, parent_id, name, depth) AS (
+			SELECT id, parent_id, name, 0 FROM files WHERE location_id=? AND id=?
+			UNION ALL
+			SELECT f.id, f.parent_id, f.name, c.depth+1
+			FROM files f JOIN chain c ON f.id = c.parent_id
+			WHERE f.location_id=? AND c.depth < 64
+		)
+		SELECT name FROM chain ORDER BY depth DESC`,
+		locationID, fileID, locationID)
+	if err != nil {
+		return "", err
+	}
+	defer rows.Close()
+	var parts []string
+	for rows.Next() {
+		var name string
+		if sErr := rows.Scan(&name); sErr != nil {
+			return "", sErr
+		}
+		parts = append(parts, name)
+	}
+	return strings.Join(parts, "/"), rows.Err()
+}
+
 // FileByID returns a single file of a location or sql.ErrNoRows.
 func (d *DB) FileByID(ctx context.Context, locationID, fileID string) (provider.FileInfo, error) {
 	row := d.db.QueryRowContext(ctx,

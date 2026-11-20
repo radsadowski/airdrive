@@ -5,6 +5,7 @@ import { useTransfersStore } from '@/stores/transfers'
 import { useOpsStore } from '@/stores/ops'
 import { useUiStore } from '@/stores/ui'
 import { Progress } from '@/components/ui/progress'
+import type { Location } from '@/lib/api/contract'
 import { formatBytes, formatSpeed } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
@@ -12,6 +13,8 @@ type Tone = 'amber' | 'success' | 'danger'
 
 interface BarItem {
   key: string
+  /** provider tag: Google Drive, S3, Local, or source → dest */
+  tag?: string
   label: string
   detail: string
   value: number
@@ -23,28 +26,42 @@ interface BarItem {
 
 const TRANSFER_LABEL = { copy: 'Copying', move: 'Moving', upload: 'Uploading' }
 const TRANSFER_ICON = { copy: Copy, move: Move, upload: Upload }
+const PROVIDER_LABEL: Record<Location['kind'], string> = {
+  gdrive: 'Google Drive',
+  s3: 'S3',
+  localfs: 'Local',
+}
+
+function providerTag(kind: Location['kind'] | undefined): string {
+  return kind ? PROVIDER_LABEL[kind] : ''
+}
 
 /**
  * ActivityBar: one strip for every operation in flight. Indexing, syncing,
- * transfers and file operations (trash, in-place moves) report here, so a
- * delete shows progress exactly like a copy or a sync pass.
+ * transfers and file operations (trash, in-place moves) report here, each with
+ * its provider and the path in flight, so a delete reads like a copy.
  */
 export function ActivityBar() {
   const crawlProgress = useAppStore((s) => s.crawlProgress)
   const locations = useAppStore((s) => s.locations)
   const runs = useSyncStore((s) => s.activeRuns)
+  const pairs = useSyncStore((s) => s.pairs)
   const batches = useTransfersStore((s) => s.batches)
   const setDrawerOpen = useTransfersStore((s) => s.setDrawerOpen)
   const ops = useOpsStore((s) => s.ops)
   const setSyncOpen = useUiStore((s) => s.setSyncOpen)
 
+  const kindOf = (locationId: string | undefined) =>
+    locations.find((l) => l.id === locationId)?.kind
+
   const items: BarItem[] = []
 
   for (const [locationId, crawl] of Object.entries(crawlProgress)) {
-    const name = locations.find((l) => l.id === locationId)?.name ?? 'location'
+    const loc = locations.find((l) => l.id === locationId)
     items.push({
       key: `index:${locationId}`,
-      label: `Indexing ${name}`,
+      tag: providerTag(loc?.kind),
+      label: `Indexing ${loc?.root || loc?.name || 'location'}`,
       detail: crawl.total > 0 ? `${crawl.done}/${crawl.total}` : `${crawl.done} files`,
       value: crawl.total > 0 ? crawl.done / crawl.total : 0,
       indeterminate: crawl.total === 0,
@@ -53,8 +70,12 @@ export function ActivityBar() {
   }
 
   for (const r of Object.values(runs)) {
+    const pair = pairs.find((p) => p.id === r.pairId)
+    const tagA = providerTag(kindOf(pair?.locationA))
+    const tagB = providerTag(kindOf(pair?.locationB))
     items.push({
       key: `sync:${r.pairId}`,
+      tag: tagA && tagB ? `${tagA} → ${tagB}` : tagA || tagB,
       label: r.name || 'Syncing',
       detail: `${r.filesTotal > 0 ? `${r.filesDone}/${r.filesTotal}` : '…'} · ${formatBytes(r.bytesDone)}${r.speed > 0 ? ` · ${formatSpeed(r.speed)}` : ''}`,
       value: r.bytesTotal > 0 ? r.bytesDone / r.bytesTotal : 0,
@@ -74,8 +95,11 @@ export function ActivityBar() {
     const single = activeBatches.length === 1 ? activeBatches[0] : null
     const Icon = single ? TRANSFER_ICON[single.action] : Copy
     const running = activeBatches.flatMap((b) => b.jobs).find((j) => j.state === 'running')
+    const tagSrc = providerTag(kindOf(single?.sourceLocationId))
+    const tagDst = providerTag(kindOf(single?.destLocationId))
     items.push({
       key: 'transfer',
+      tag: tagSrc && tagDst ? `${tagSrc} → ${tagDst}` : tagSrc || tagDst,
       label: single
         ? `${TRANSFER_LABEL[single.action]} ${single.jobs.length} item${single.jobs.length !== 1 ? 's' : ''}${running ? ` · ${running.destPath || running.sourceName}` : ''}`
         : `${activeBatches.length} transfers`,
@@ -90,7 +114,8 @@ export function ActivityBar() {
     const verb = op.op === 'delete' ? 'Moving to Trash' : 'Moving'
     items.push({
       key: `op:${op.opId}`,
-      label: op.current ? `${verb} · ${op.current}` : verb,
+      tag: providerTag(kindOf(op.locationId)),
+      label: op.path ? `${verb} · ${op.path}` : verb,
       detail: `${op.done}/${op.total}${op.state === 'error' ? ' · failed' : ''}`,
       value: op.total > 0 ? op.done / op.total : 0,
       tone: op.state === 'error' ? 'danger' : op.state === 'done' ? 'success' : 'amber',
@@ -104,9 +129,15 @@ export function ActivityBar() {
     <div className="flex h-7 w-full shrink-0 items-center gap-3 overflow-x-auto border-t border-hairline bg-panel/80 px-4 backdrop-blur">
       <Loader2 size={11} className="shrink-0 animate-spin text-amber" />
       {items.map((item) => {
+        const title = item.tag ? `${item.tag} · ${item.label}` : item.label
         const content = (
           <>
             <span className={cn('shrink-0', item.tone === 'danger' ? 'text-danger' : 'text-ink-mut')}>{item.icon}</span>
+            {item.tag && (
+              <span className="shrink-0 rounded-[3px] border border-hairline px-1 py-px font-mono text-[9px] uppercase tracking-[0.08em] text-ink-faint">
+                {item.tag}
+              </span>
+            )}
             <span className="shrink-0 truncate text-[11.5px] text-ink">{item.label}</span>
             <span className="shrink-0 font-mono text-[10px] tabular text-ink-faint">{item.detail}</span>
             <Progress
@@ -121,13 +152,13 @@ export function ActivityBar() {
           <button
             key={item.key}
             onClick={item.onClick}
-            title={item.label}
+            title={title}
             className="flex min-w-0 max-w-[320px] flex-1 items-center gap-2 text-left transition-opacity hover:opacity-80"
           >
             {content}
           </button>
         ) : (
-          <span key={item.key} title={item.label} className="flex min-w-0 max-w-[320px] flex-1 items-center gap-2">
+          <span key={item.key} title={title} className="flex min-w-0 max-w-[320px] flex-1 items-center gap-2">
             {content}
           </span>
         )
