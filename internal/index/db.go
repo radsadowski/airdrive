@@ -362,6 +362,7 @@ func (d *DB) CountSubtree(ctx context.Context, locationID, fileID string) (int, 
 // FileOp is one scheduled file operation in the ledger.
 type FileOp struct {
 	ID         string
+	GroupID    string
 	LocationID string
 	ItemID     string
 	ItemPath   string
@@ -382,8 +383,8 @@ func (d *DB) BeginFileOps(ctx context.Context, ops []FileOp) error {
 	defer func() { _ = tx.Rollback() }()
 	for _, op := range ops {
 		res, insErr := tx.ExecContext(ctx,
-			`INSERT OR IGNORE INTO file_ops(id,location_id,item_id,item_path,kind,state) VALUES(?,?,?,?,?,'running')`,
-			op.ID, op.LocationID, op.ItemID, op.ItemPath, op.Kind)
+			`INSERT OR IGNORE INTO file_ops(id,group_id,location_id,item_id,item_path,kind,state) VALUES(?,?,?,?,?,?,'running')`,
+			op.ID, op.GroupID, op.LocationID, op.ItemID, op.ItemPath, op.Kind)
 		if insErr != nil {
 			return fmt.Errorf("begin file ops: %w", insErr)
 		}

@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -231,4 +232,87 @@ func TestWhenADeleteIsAlreadyRunningThenASecondDeleteIsRejected(t *testing.T) {
 
 	close(release)
 	r.NoError(<-done)
+}
+
+func opIDFromEvents(t *testing.T, rec *opEventRecorder) string {
+	t.Helper()
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		for _, payload := range rec.snapshot() {
+			if id, ok := payload["opId"].(string); ok && id != "" {
+				return id
+			}
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatal("no operation event was emitted")
+	return ""
+}
+
+func TestWhenAnOperationIsCancelledThenItReportsCancelledAndReleasesTheItem(t *testing.T) {
+	t.Parallel()
+	r := require.New(t)
+	ctrl := gomock.NewController(t)
+	svc, p, rec := newOpTestService(t, ctrl)
+	seedOpFile(t, svc, "a")
+
+	started := make(chan struct{}, 1)
+	p.EXPECT().Delete(gomock.Any(), "L1", gomock.Any()).Times(1).DoAndReturn(
+		func(ctx context.Context, _ string, _ []string) error {
+			started <- struct{}{}
+			<-ctx.Done()
+			return ctx.Err()
+		})
+
+	done := make(chan error, 1)
+	go func() { done <- svc.DeleteFiles("L1", []string{"a"}) }()
+	<-started
+
+	r.NoError(svc.CancelFileOp(opIDFromEvents(t, rec)))
+	r.NoError(<-done)
+
+	events := rec.snapshot()
+	last := events[len(events)-1]
+	r.Equal(opCancelled, last["state"])
+
+	r.NoError(svc.db.BeginFileOps(context.Background(), []index.FileOp{
+		{ID: "probe", LocationID: "L1", ItemID: "a", Kind: "delete"},
+	}), "a canceled operation must release the item")
+}
+
+func TestWhenAnOperationIsCancelledThenRemainingItemsAreNotStarted(t *testing.T) {
+	t.Parallel()
+	r := require.New(t)
+	ctrl := gomock.NewController(t)
+	svc, p, rec := newOpTestService(t, ctrl)
+
+	ids := make([]string, 0, 6)
+	for i := 0; i < 6; i++ {
+		id := fmt.Sprintf("f%d", i)
+		ids = append(ids, id)
+		seedOpFile(t, svc, id)
+	}
+	var calls atomic.Int64
+	p.EXPECT().Delete(gomock.Any(), "L1", gomock.Any()).AnyTimes().DoAndReturn(
+		func(ctx context.Context, _ string, _ []string) error {
+			calls.Add(1)
+			<-ctx.Done()
+			return ctx.Err()
+		})
+
+	done := make(chan error, 1)
+	go func() { done <- svc.DeleteFiles("L1", ids) }()
+
+	deadline := time.Now().Add(3 * time.Second)
+	for calls.Load() == 0 && time.Now().Before(deadline) {
+		time.Sleep(5 * time.Millisecond)
+	}
+	r.Greater(calls.Load(), int64(0), "at least one provider call started")
+
+	r.NoError(svc.CancelFileOp(opIDFromEvents(t, rec)))
+	r.NoError(<-done)
+	r.Less(calls.Load(), int64(len(ids)), "canceling must stop the remaining items")
+
+	events := rec.snapshot()
+	r.Equal(opCancelled, events[len(events)-1]["state"])
 }

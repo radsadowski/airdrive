@@ -36,6 +36,7 @@ const (
 	opDone        = "done"
 	opError       = "error"
 	opInterrupted = "interrupted"
+	opCancelled   = "canceled"
 )
 
 // fileOpWorkers bounds how many selected items a delete or in-place move
@@ -54,6 +55,9 @@ type FileService struct {
 	emit func(name string, data ...any)
 	// downloadDir reads the current download folder from settings.
 	downloadDir func() string
+	// ops holds the cancel handle of every running file operation.
+	opsMu sync.Mutex
+	ops   map[string]context.CancelFunc
 }
 
 func NewFileService(app *application.App, db *index.DB, registry *provider.Registry, logger *slog.Logger, downloadDir func() string) *FileService {
@@ -64,6 +68,7 @@ func NewFileService(app *application.App, db *index.DB, registry *provider.Regis
 		logger:      logger,
 		emit:        func(string, ...any) {},
 		downloadDir: downloadDir,
+		ops:         map[string]context.CancelFunc{},
 	}
 }
 
@@ -169,7 +174,8 @@ func (s *FileService) MoveWithin(locationID string, fileIDs []string, destDirID 
 	if err != nil {
 		return err
 	}
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	targets := s.opTargets(ctx, locationID, fileIDs)
 	if len(targets) == 0 {
 		return nil
@@ -186,12 +192,15 @@ func (s *FileService) MoveWithin(locationID string, fileIDs []string, destDirID 
 	}
 
 	opID := uuid.NewString()
+	s.registerOp(opID, cancel)
+	defer s.unregisterOp(opID)
+
 	opIDs := make([]string, len(targets))
 	ledger := make([]index.FileOp, 0, len(targets))
 	for i, t := range targets {
 		opIDs[i] = uuid.NewString()
 		ledger = append(ledger, index.FileOp{
-			ID: opIDs[i], LocationID: locationID, ItemID: t.id, ItemPath: t.path, Kind: opMove,
+			ID: opIDs[i], GroupID: opID, LocationID: locationID, ItemID: t.id, ItemPath: t.path, Kind: opMove,
 		})
 	}
 	if lErr := s.db.BeginFileOps(ctx, ledger); lErr != nil {
@@ -203,7 +212,7 @@ func (s *FileService) MoveWithin(locationID string, fileIDs []string, destDirID 
 	finished := make([]bool, len(targets))
 	finish := func(i int, state, msg string) {
 		finished[i] = true
-		if fErr := s.db.FinishFileOp(ctx, opIDs[i], state, msg); fErr != nil {
+		if fErr := s.db.FinishFileOp(context.Background(), opIDs[i], state, msg); fErr != nil {
 			s.logger.Warn("file ops: finish", "id", opIDs[i], "err", fErr)
 		}
 	}
@@ -217,7 +226,7 @@ func (s *FileService) MoveWithin(locationID string, fileIDs []string, destDirID 
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, fileOpWorkers)
 	for i := range targets {
-		if failed.Load() {
+		if failed.Load() || ctx.Err() != nil {
 			break
 		}
 		t := targets[i]
@@ -226,7 +235,15 @@ func (s *FileService) MoveWithin(locationID string, fileIDs []string, destDirID 
 		go func(i int, t opTarget) {
 			defer wg.Done()
 			defer func() { <-sem }()
+			if ctx.Err() != nil {
+				finish(i, opCancelled, "canceled")
+				return
+			}
 			if err := p.MoveWithin(ctx, locationID, []string{t.id}, destDirID); err != nil {
+				if ctx.Err() != nil {
+					finish(i, opCancelled, "canceled")
+					return
+				}
 				finish(i, opError, err.Error())
 				mu.Lock()
 				if firstErr == nil {
@@ -238,21 +255,32 @@ func (s *FileService) MoveWithin(locationID string, fileIDs []string, destDirID 
 				return
 			}
 			newPath := filepath.Join(destDirID, filepath.Base(t.id))
-			_ = s.db.DeleteFile(ctx, locationID, t.id)
-			if f, err := p.Stat(ctx, locationID, newPath); err == nil {
-				_ = s.db.UpsertFile(ctx, f)
+			_ = s.db.DeleteFile(context.Background(), locationID, t.id)
+			if f, err := p.Stat(context.Background(), locationID, newPath); err == nil {
+				_ = s.db.UpsertFile(context.Background(), f)
 			}
 			if old, ok := oldParents[t.id]; ok {
 				s.emitFsChanged(locationID, old)
 			}
 			finish(i, opDone, "")
 			n := int(done.Add(int64(t.count)))
-			if !failed.Load() {
+			if ctx.Err() == nil && !failed.Load() {
 				s.emitOp(opID, opMove, locationID, n, total, opRunning, t.path, "")
 			}
 		}(i, t)
 	}
 	wg.Wait()
+
+	if ctx.Err() != nil {
+		for i := range targets {
+			if !finished[i] {
+				finish(i, opCancelled, "canceled")
+			}
+		}
+		s.emitOp(opID, opMove, locationID, int(done.Load()), total, opCancelled, "", "")
+		s.emitFsChanged(locationID, destDirID)
+		return nil
+	}
 
 	mu.Lock()
 	err = firstErr
@@ -268,6 +296,32 @@ func (s *FileService) MoveWithin(locationID string, fileIDs []string, destDirID 
 	s.emitOp(opID, opMove, locationID, total, total, opDone, "", "")
 	s.emitFsChanged(locationID, destDirID)
 	return nil
+}
+
+// CancelFileOp stops a running file operation. Work already handed to a
+// provider may still finish, so the index and the provider can disagree until
+// the next crawl; the UI warns about that before calling this.
+func (s *FileService) CancelFileOp(opID string) error {
+	s.opsMu.Lock()
+	cancel, ok := s.ops[opID]
+	s.opsMu.Unlock()
+	if !ok {
+		return fmt.Errorf("cancel: no running operation %q", opID)
+	}
+	cancel()
+	return nil
+}
+
+func (s *FileService) registerOp(opID string, cancel context.CancelFunc) {
+	s.opsMu.Lock()
+	s.ops[opID] = cancel
+	s.opsMu.Unlock()
+}
+
+func (s *FileService) unregisterOp(opID string) {
+	s.opsMu.Lock()
+	delete(s.ops, opID)
+	s.opsMu.Unlock()
 }
 
 // opTarget is one selected item with the number of index rows it covers.
@@ -310,7 +364,8 @@ func (s *FileService) DeleteFiles(locationID string, fileIDs []string) error {
 	if err != nil {
 		return err
 	}
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	targets := s.opTargets(ctx, locationID, fileIDs)
 	if len(targets) == 0 {
 		return nil
@@ -327,12 +382,15 @@ func (s *FileService) DeleteFiles(locationID string, fileIDs []string) error {
 	}
 
 	opID := uuid.NewString()
+	s.registerOp(opID, cancel)
+	defer s.unregisterOp(opID)
+
 	opIDs := make([]string, len(targets))
 	ledger := make([]index.FileOp, 0, len(targets))
 	for i, t := range targets {
 		opIDs[i] = uuid.NewString()
 		ledger = append(ledger, index.FileOp{
-			ID: opIDs[i], LocationID: locationID, ItemID: t.id, ItemPath: t.path, Kind: opDelete,
+			ID: opIDs[i], GroupID: opID, LocationID: locationID, ItemID: t.id, ItemPath: t.path, Kind: opDelete,
 		})
 	}
 	if lErr := s.db.BeginFileOps(ctx, ledger); lErr != nil {
@@ -344,7 +402,7 @@ func (s *FileService) DeleteFiles(locationID string, fileIDs []string) error {
 	finished := make([]bool, len(targets))
 	finish := func(i int, state, msg string) {
 		finished[i] = true
-		if fErr := s.db.FinishFileOp(ctx, opIDs[i], state, msg); fErr != nil {
+		if fErr := s.db.FinishFileOp(context.Background(), opIDs[i], state, msg); fErr != nil {
 			s.logger.Warn("file ops: finish", "id", opIDs[i], "err", fErr)
 		}
 	}
@@ -358,7 +416,7 @@ func (s *FileService) DeleteFiles(locationID string, fileIDs []string) error {
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, fileOpWorkers)
 	for i := range targets {
-		if failed.Load() {
+		if failed.Load() || ctx.Err() != nil {
 			break
 		}
 		t := targets[i]
@@ -367,7 +425,15 @@ func (s *FileService) DeleteFiles(locationID string, fileIDs []string) error {
 		go func(i int, t opTarget) {
 			defer wg.Done()
 			defer func() { <-sem }()
+			if ctx.Err() != nil {
+				finish(i, opCancelled, "canceled")
+				return
+			}
 			if err := p.Delete(ctx, locationID, []string{t.id}); err != nil {
+				if ctx.Err() != nil {
+					finish(i, opCancelled, "canceled")
+					return
+				}
 				finish(i, opError, err.Error())
 				mu.Lock()
 				if firstErr == nil {
@@ -378,17 +444,30 @@ func (s *FileService) DeleteFiles(locationID string, fileIDs []string) error {
 				mu.Unlock()
 				return
 			}
-			if dErr := s.db.DeleteTree(ctx, locationID, t.id); dErr != nil {
+			if dErr := s.db.DeleteTree(context.Background(), locationID, t.id); dErr != nil {
 				s.logger.Warn("delete file from index", "location", locationID, "id", t.id, "err", dErr)
 			}
 			finish(i, opDone, "")
 			n := int(done.Add(int64(t.count)))
-			if !failed.Load() {
+			if ctx.Err() == nil && !failed.Load() {
 				s.emitOp(opID, opDelete, locationID, n, total, opRunning, t.path, "")
 			}
 		}(i, t)
 	}
 	wg.Wait()
+
+	if ctx.Err() != nil {
+		for i := range targets {
+			if !finished[i] {
+				finish(i, opCancelled, "canceled")
+			}
+		}
+		s.emitOp(opID, opDelete, locationID, int(done.Load()), total, opCancelled, "", "")
+		for parent := range parents {
+			s.emitFsChanged(locationID, parent)
+		}
+		return nil
+	}
 
 	mu.Lock()
 	err = firstErr

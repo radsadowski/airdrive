@@ -19,6 +19,7 @@ import { SyncPanel } from '@/components/sync'
 import { ActivityBar } from '@/components/activity-bar'
 import { PromptDialog } from '@/components/prompt'
 import { ReconnectPrompt } from '@/components/reconnect-prompt'
+import { CancelOpDialog } from '@/components/cancel-op-dialog'
 import { Toasts } from '@/components/toasts'
 import { DevPanel } from '@/components/devpanel'
 import { Onboarding } from '@/components/onboarding'
@@ -190,6 +191,7 @@ export function AppShell() {
       <SyncPanel />
       <PromptDialog />
       <ReconnectPrompt />
+      <CancelOpDialog />
       <Toasts />
       <DevPanel />
     </div>

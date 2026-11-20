@@ -233,7 +233,7 @@ export interface AppEventMap {
     locationId: string
     done: number
     total: number
-    state: 'running' | 'done' | 'error'
+    state: 'running' | 'done' | 'error' | 'canceled'
     /** root-relative path of the item currently being processed */
     path?: string
     error?: string
@@ -337,6 +337,8 @@ export interface ApiClient {
   listDir(locationId: string, dirId: string | null, opts?: ListDirOptions): Promise<Page<FileInfo>>
   stat(locationId: string, fileId: string): Promise<FileInfo>
   mkdir(locationId: string, parentId: string | null, name: string): Promise<FileInfo>
+  /** stop a running delete/move; work already handed to the provider may finish */
+  cancelFileOp(opId: string): Promise<void>
   rename(locationId: string, fileId: string, newName: string): Promise<FileInfo>
   /** same-provider move (cheap, native on Drive / local) */
   moveWithin(locationId: string, fileIds: string[], destDirId: string | null): Promise<void>

@@ -228,6 +228,10 @@ class WailsClientImpl implements ApiClient, EventBus {
     await FileSvc.MoveWithin(locationId, fileIds, destDirId ?? '')
   }
 
+  async cancelFileOp(opId: string): Promise<void> {
+    await FileSvc.CancelFileOp(opId)
+  }
+
   async deleteFiles(locationId: string, fileIds: string[]): Promise<void> {
     await FileSvc.DeleteFiles(locationId, fileIds)
   }

@@ -89,13 +89,19 @@ class MockClient implements ApiClient {
     return out
   }
 
+  private cancelledOps = new Set<string>()
+
+  async cancelFileOp(opId: string): Promise<void> {
+    this.cancelledOps.add(opId)
+  }
+
   private emitOp(
     opId: string,
     op: 'delete' | 'move',
     locationId: string,
     done: number,
     total: number,
-    state: 'running' | 'done' | 'error',
+    state: 'running' | 'done' | 'error' | 'canceled',
     path?: string,
   ): void {
     bus.emit('fileop:progress', { opId, op, locationId, done, total, state, path })
@@ -375,6 +381,12 @@ class MockClient implements ApiClient {
       if (arr2) arr2.push(id)
       else this.state.children.set(key, [id])
       await sleep(90)
+      if (this.cancelledOps.delete(opId)) {
+        this.emitOp(opId, 'move', locationId, done, total, 'canceled')
+        for (const d of touchedOld) this.touch(locationId, d)
+        this.touch(locationId, destDirId)
+        return
+      }
       done += sizes[index]
       const nextPath = fileIds[index + 1] ? this.displayPath(fileIds[index + 1]) : this.displayPath(id)
       this.emitOp(opId, 'move', locationId, done, total, 'running', nextPath)
@@ -398,6 +410,12 @@ class MockClient implements ApiClient {
       touchedDirs.add(n.parentId)
       for (const sid of this.subtreeIds(id)) this.state.node(sid).trashed = true
       await sleep(90)
+      if (this.cancelledOps.delete(opId)) {
+        this.emitOp(opId, 'delete', locationId, done, total, 'canceled')
+        for (const d of touchedDirs) this.touch(locationId, d)
+        this.refreshCounts(locationId)
+        return
+      }
       done += sizes[index]
       const nextPath = fileIds[index + 1] ? this.displayPath(fileIds[index + 1]) : this.displayPath(id)
       this.emitOp(opId, 'delete', locationId, done, total, 'running', nextPath)

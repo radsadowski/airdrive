@@ -18,10 +18,21 @@ import * as entities$0 from "../entities/models.js";
 import * as application$0 from "../../../../wailsapp/wails/v3/pkg/application/models.js";
 
 /**
+ * CancelFileOp stops a running file operation. Work already handed to a
+ * provider may still finish, so the index and the provider can disagree until
+ * the next crawl; the UI warns about that before calling this.
+ */
+export function CancelFileOp(opID: string): $CancellablePromise<void> {
+    return $Call.ByID(3672103841, opID);
+}
+
+/**
  * DeleteFiles moves files to trash and removes them from the index, reporting
  * the indexed scope of each selected item so a folder delete shows how many
  * entries it covers and which one is in flight. Selected items are removed by
- * fileOpWorkers at a time; a folder is still one provider primitive.
+ * fileOpWorkers at a time; a folder is still one provider primitive. Every
+ * item is recorded in the file_ops ledger first, so the same item cannot be
+ * scheduled twice while it is being removed.
  */
 export function DeleteFiles(locationID: string, fileIDs: string[]): $CancellablePromise<void> {
     return $Call.ByID(740463736, locationID, fileIDs);
@@ -58,7 +69,8 @@ export function Mkdir(locationID: string, parentID: string, name: string): $Canc
  * MoveWithin moves files to another directory within the same location,
  * reporting the indexed scope of each selected item. Items move by
  * fileOpWorkers at a time; a folder is renamed as one provider primitive, so
- * its step lands when the whole subtree moved.
+ * its step lands when the whole subtree moved. Every item is recorded in the
+ * file_ops ledger first, so the same item cannot be moved or deleted twice.
  */
 export function MoveWithin(locationID: string, fileIDs: string[], destDirID: string): $CancellablePromise<void> {
     return $Call.ByID(1732874444, locationID, fileIDs, destDirID);

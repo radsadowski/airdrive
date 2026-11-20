@@ -1,4 +1,4 @@
-import { ArrowLeftRight, Copy, Loader2, Move, RefreshCw, Trash2, Upload } from 'lucide-react'
+import { ArrowLeftRight, Copy, Loader2, Move, RefreshCw, Trash2, Upload, X } from 'lucide-react'
 import { useAppStore } from '@/stores/app'
 import { useSyncStore } from '@/stores/sync'
 import { useTransfersStore } from '@/stores/transfers'
@@ -22,6 +22,7 @@ interface BarItem {
   tone?: Tone
   icon: React.ReactNode
   onClick?: () => void
+  onCancel?: () => void
 }
 
 const TRANSFER_LABEL = { copy: 'Copying', move: 'Moving', upload: 'Uploading' }
@@ -116,10 +117,14 @@ export function ActivityBar() {
       key: `op:${op.opId}`,
       tag: providerTag(kindOf(op.locationId)),
       label: op.path ? `${verb} · ${op.path}` : verb,
-      detail: `${op.done}/${op.total}${op.state === 'error' ? ' · failed' : ''}`,
+      detail: `${op.done}/${op.total}${op.state === 'error' ? ' · failed' : op.state === 'canceled' ? ' · canceled' : ''}`,
       value: op.total > 0 ? op.done / op.total : 0,
       tone: op.state === 'error' ? 'danger' : op.state === 'done' ? 'success' : 'amber',
       icon: op.op === 'delete' ? <Trash2 size={11} /> : <Move size={11} />,
+      onCancel:
+        op.state === 'running'
+          ? () => useUiStore.getState().askCancelOp({ opId: op.opId, label: op.path || verb })
+          : undefined,
     })
   }
 
@@ -160,6 +165,16 @@ export function ActivityBar() {
         ) : (
           <span key={item.key} title={title} className="flex min-w-0 max-w-[320px] flex-1 items-center gap-2">
             {content}
+            {item.onCancel && (
+              <button
+                type="button"
+                title="Cancel operation"
+                onClick={item.onCancel}
+                className="shrink-0 rounded p-0.5 text-ink-faint transition-colors hover:bg-danger/15 hover:text-danger"
+              >
+                <X size={11} />
+              </button>
+            )}
           </span>
         )
       })}

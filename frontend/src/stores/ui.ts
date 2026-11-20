@@ -20,6 +20,8 @@ interface UiState {
   clipboard: { mode: 'copy' | 'cut'; fileIds: string[]; sourceLocationId: string } | null
   /** auto-opened prompt for a location whose credentials must be renewed */
   reconnectPrompt: { locationId: string; name: string; error: string } | null
+  /** confirmation prompt before cancelling a running file operation */
+  cancelPrompt: { opId: string; label: string } | null
 
   pushToast: (t: Omit<ToastPayload, 'id'>) => void
   dismissToast: (id: string) => void
@@ -38,6 +40,8 @@ interface UiState {
   promptReconnect: (p: { locationId: string; name: string; error: string }) => void
   dismissReconnect: () => void
   resolveReconnect: (locationId: string) => void
+  askCancelOp: (p: { opId: string; label: string }) => void
+  dismissCancelOp: () => void
 }
 
 let toastSeq = 0
@@ -62,6 +66,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   transferPicker: null,
   clipboard: null,
   reconnectPrompt: null,
+  cancelPrompt: null,
 
   pushToast(t) {
     const id = `toast_${Date.now()}_${toastSeq++}`
@@ -136,6 +141,14 @@ export const useUiStore = create<UiState>((set, get) => ({
   resolveReconnect(locationId) {
     reconnectPrompted.delete(locationId)
     set({ reconnectPrompt: null })
+  },
+
+  askCancelOp(p) {
+    set({ cancelPrompt: p })
+  },
+
+  dismissCancelOp() {
+    set({ cancelPrompt: null })
   },
 }))
 
