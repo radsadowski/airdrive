@@ -4,7 +4,7 @@
  */
 
 import { api } from '@/lib/api'
-import { toApiError } from '@/lib/api/contract-helpers'
+import { isInProgressError, toApiError } from '@/lib/api/contract-helpers'
 import type { FileInfo } from '@/lib/api/contract'
 import { openPrompt } from '@/components/prompt'
 import { useAppStore } from '@/stores/app'
@@ -46,9 +46,30 @@ export function renameSelection(file: FileInfo): void {
 }
 
 let trashInFlight: Promise<void> | null = null
+const inProgressNotified = new Map<string, number>()
+
+function notifyInProgress(kind: 'delete' | 'move'): void {
+  const now = Date.now()
+  if (now - (inProgressNotified.get(kind) ?? 0) < 2000) return
+  inProgressNotified.set(kind, now)
+  useUiStore.getState().pushToast(
+    kind === 'delete'
+      ? {
+          title: 'Delete already in progress',
+          description: 'The selected items are already being moved to the trash.',
+        }
+      : {
+          title: 'Move already in progress',
+          description: 'The selected items are already being moved.',
+        },
+  )
+}
 
 export function trashSelection(): Promise<void> {
-  if (trashInFlight) return trashInFlight
+  if (trashInFlight) {
+    notifyInProgress('delete')
+    return trashInFlight
+  }
   const s = useAppStore.getState()
   if (!s.currentLocationId || s.selection.length === 0) return Promise.resolve()
   const ids = [...s.selection]
@@ -58,7 +79,13 @@ export function trashSelection(): Promise<void> {
       useAppStore.getState().clearSelection()
       refresh()
     })
-    .catch(toastError)
+    .catch((e) => {
+      if (isInProgressError(e)) {
+        notifyInProgress('delete')
+        return
+      }
+      toastError(e)
+    })
     .finally(() => {
       trashInFlight = null
     })
@@ -118,6 +145,10 @@ export async function pasteIntoCurrentDir(): Promise<void> {
       if (mode === 'cut') useUiStore.getState().setClipboard(null)
     }
   } catch (e) {
+    if (isInProgressError(e)) {
+      notifyInProgress('move')
+      return
+    }
     toastError(e)
   }
 }

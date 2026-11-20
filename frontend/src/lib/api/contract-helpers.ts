@@ -19,3 +19,8 @@ export function toApiError(e: unknown): { code: string; message: string; retryab
   if (e instanceof Error) return { code: 'unknown', message: e.message, retryable: false }
   return { code: 'unknown', message: String(e), retryable: false }
 }
+
+/** the file-op ledger rejected a duplicate schedule for the same item */
+export function isInProgressError(e: unknown): boolean {
+  return toApiError(e).message.toLowerCase().includes('already being deleted or moved')
+}
