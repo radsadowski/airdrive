@@ -1,5 +1,6 @@
 import { Gauge, Keyboard, Minus, Moon, Plus, Settings2, Sun } from 'lucide-react'
-import { useUiStore } from '@/stores/ui'
+import { useUiStore, toastError } from '@/stores/ui'
+import { api } from '@/lib/api'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Switch } from '@/components/ui/switch'
 import { Kbd } from '@/components/ui/badge'
@@ -21,6 +22,15 @@ export function SettingsDialog() {
   const setOpen = useUiStore((s) => s.setSettingsOpen)
   const settings = useUiStore((s) => s.settings)
   const patch = useUiStore((s) => s.patchSettings)
+
+  const chooseDownloadDir = async () => {
+    try {
+      const dir = await api.pickFolder()
+      if (dir) await patch({ downloadDir: dir })
+    } catch (e) {
+      toastError(e)
+    }
+  }
 
   if (!open) return null
 
@@ -59,7 +69,7 @@ export function SettingsDialog() {
           <div className="mb-1 mt-3 flex items-center gap-1.5 font-mono text-[9.5px] uppercase tracking-[0.14em] text-ink-faint">
             <Gauge size={10} /> transfers
           </div>
-          <Row label="Concurrent file transfers" hint="worker pool size: the engine picks this up live">
+          <Row label="Concurrent file transfers" hint="the single speed knob: more workers, more throughput, applied live">
             <div className="flex items-center gap-1.5">
               <button
                 aria-label="Fewer concurrent transfers"
@@ -80,11 +90,18 @@ export function SettingsDialog() {
               </button>
             </div>
           </Row>
-          <Row label="Bandwidth limit" hint="keeps the home network usable during migrations">
-            <span className="font-mono text-[12px] tabular text-amber">{settings.bandwidthLimitMbps} Mbps</span>
-          </Row>
           <Row label="Download folder" hint="one-click downloads land here">
-            <span className="font-mono text-[11px] text-ink-mut">{settings.downloadDir}</span>
+            <div className="flex items-center gap-2">
+              <span className="max-w-[190px] truncate font-mono text-[11px] text-ink-mut" title={settings.downloadDir}>
+                {settings.downloadDir || '~/Downloads'}
+              </span>
+              <button
+                onClick={() => void chooseDownloadDir()}
+                className="shrink-0 rounded border border-hairline px-1.5 py-0.5 text-[11px] text-ink-mut transition-colors hover:border-amber/40 hover:text-amber"
+              >
+                Change…
+              </button>
+            </div>
           </Row>
 
           <div className="mb-1 mt-3 flex items-center gap-1.5 font-mono text-[9.5px] uppercase tracking-[0.14em] text-ink-faint">

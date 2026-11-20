@@ -371,7 +371,6 @@ export class Settings {
     "theme": string;
     "defaultView": string;
     "concurrentTransfers": number;
-    "bandwidthLimitMbps": number;
     "showHiddenFiles": boolean;
     "downloadDir": string;
 
@@ -385,9 +384,6 @@ export class Settings {
         }
         if (!("concurrentTransfers" in $$source)) {
             this["concurrentTransfers"] = 0;
-        }
-        if (!("bandwidthLimitMbps" in $$source)) {
-            this["bandwidthLimitMbps"] = 0;
         }
         if (!("showHiddenFiles" in $$source)) {
             this["showHiddenFiles"] = false;

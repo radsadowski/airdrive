@@ -63,9 +63,9 @@ func main() {
 	transfers := bridge.NewTransferService(db, registry, logger, func() bridge.TransferSettings {
 		cfg, cErr := settingsSvc.Get()
 		if cErr != nil {
-			return bridge.TransferSettings{ConcurrentTransfers: 3, BandwidthLimitMbps: 80}
+			return bridge.TransferSettings{ConcurrentTransfers: 3}
 		}
-		return bridge.TransferSettings{ConcurrentTransfers: cfg.ConcurrentTransfers, BandwidthLimitMbps: cfg.BandwidthLimitMbps}
+		return bridge.TransferSettings{ConcurrentTransfers: cfg.ConcurrentTransfers}
 	})
 
 	// Watcher is created before the app so it can be passed into services.
@@ -95,7 +95,13 @@ func main() {
 	// Services hold a pointer that we fill in after application.New.
 	appSvc := bridge.NewAppService(nil)
 	locSvc := bridge.NewLocationService(nil, db, registry, w, logger)
-	fileSvc := bridge.NewFileService(nil, db, registry, logger)
+	fileSvc := bridge.NewFileService(nil, db, registry, logger, func() string {
+		cfg, sErr := settingsSvc.Get()
+		if sErr != nil {
+			return ""
+		}
+		return cfg.DownloadDir
+	})
 	syncSvc := bridge.NewSyncService(db, registry, logger)
 
 	app := application.New(application.Options{

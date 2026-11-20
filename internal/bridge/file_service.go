@@ -50,16 +50,36 @@ type FileService struct {
 	// emit is the event seam; the no-op default lets tests record progress
 	// without a Wails app.
 	emit func(name string, data ...any)
+	// downloadDir reads the current download folder from settings.
+	downloadDir func() string
 }
 
-func NewFileService(app *application.App, db *index.DB, registry *provider.Registry, logger *slog.Logger) *FileService {
-	return &FileService{app: app, db: db, registry: registry, logger: logger, emit: func(string, ...any) {}}
+func NewFileService(app *application.App, db *index.DB, registry *provider.Registry, logger *slog.Logger, downloadDir func() string) *FileService {
+	return &FileService{
+		app:         app,
+		db:          db,
+		registry:    registry,
+		logger:      logger,
+		emit:        func(string, ...any) {},
+		downloadDir: downloadDir,
+	}
 }
 
 // SetApp injects the Wails app reference after application.New returns.
 func (s *FileService) SetApp(app *application.App) {
 	s.app = app
 	s.emit = func(name string, data ...any) { app.Event.Emit(name, data...) }
+}
+
+// resolveDownloadDir prefers the configured folder and falls back to the
+// macOS Downloads directory.
+func (s *FileService) resolveDownloadDir() string {
+	if s.downloadDir != nil {
+		if dir := s.downloadDir(); dir != "" {
+			return dir
+		}
+	}
+	return filepath.Join(os.Getenv("HOME"), "Downloads")
 }
 
 func (s *FileService) provider(locationID string) (provider.StorageProvider, error) {
@@ -324,7 +344,10 @@ func (s *FileService) Download(locationID string, fileIDs []string) ([]string, e
 	if err != nil {
 		return nil, err
 	}
-	downloadsDir := filepath.Join(os.Getenv("HOME"), "Downloads")
+	downloadsDir := s.resolveDownloadDir()
+	if err := os.MkdirAll(downloadsDir, 0o755); err != nil {
+		return nil, fmt.Errorf("download: create folder: %w", err)
+	}
 	var targets []string
 	for _, id := range fileIDs {
 		rc, fi, err := p.Download(context.Background(), locationID, id)

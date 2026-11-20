@@ -27,7 +27,6 @@ const DEFAULT_SETTINGS: Settings = {
   theme: 'dark',
   defaultView: 'list',
   concurrentTransfers: 3,
-  bandwidthLimitMbps: 80,
   showHiddenFiles: false,
   downloadDir: '/Users/you/Downloads',
 }

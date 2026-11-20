@@ -56,7 +56,6 @@ export const useUiStore = create<UiState>((set, get) => ({
     theme: 'dark',
     defaultView: 'list',
     concurrentTransfers: 3,
-    bandwidthLimitMbps: 80,
     showHiddenFiles: false,
     downloadDir: '/Users/you/Downloads',
   },

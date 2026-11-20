@@ -19,7 +19,9 @@ import * as application$0 from "../../../../wailsapp/wails/v3/pkg/application/mo
 
 /**
  * DeleteFiles moves files to trash and removes them from the index, reporting
- * per-item progress so a large selection shows movement in the activity bar.
+ * the indexed scope of each selected item so a folder delete shows how many
+ * entries it covers and which one is in flight. Selected items are removed by
+ * fileOpWorkers at a time; a folder is still one provider primitive.
  */
 export function DeleteFiles(locationID: string, fileIDs: string[]): $CancellablePromise<void> {
     return $Call.ByID(740463736, locationID, fileIDs);
@@ -54,8 +56,9 @@ export function Mkdir(locationID: string, parentID: string, name: string): $Canc
 
 /**
  * MoveWithin moves files to another directory within the same location,
- * reporting per-item progress so a cut and paste shows movement in the
- * activity bar instead of completing silently.
+ * reporting the indexed scope of each selected item. Items move by
+ * fileOpWorkers at a time; a folder is renamed as one provider primitive, so
+ * its step lands when the whole subtree moved.
  */
 export function MoveWithin(locationID: string, fileIDs: string[], destDirID: string): $CancellablePromise<void> {
     return $Call.ByID(1732874444, locationID, fileIDs, destDirID);

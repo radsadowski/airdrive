@@ -15,6 +15,8 @@ export interface TransferEngineDeps {
 }
 
 const TICK_MS = 350
+/** simulated shared link: workers split it, like a real connection */
+const SIM_LINK_BPS = 10_000_000
 
 export class TransferEngine {
   private state: MockState
@@ -181,7 +183,6 @@ export class TransferEngine {
 
   private tick(): void {
     const { state } = this
-    const limitBps = Math.max(1, state.settings.bandwidthLimitMbps) * 1_000_000 / 8
     const maxConcurrent = state.settings.concurrentTransfers
 
     const running = state.jobs.filter((j) => j.state === 'running')
@@ -208,7 +209,7 @@ export class TransferEngine {
       return
     }
 
-    const perJob = limitBps / running.length
+    const perJob = SIM_LINK_BPS / running.length
     for (const j of running) {
       const jitter = 0.6 + Math.random() * 0.8
       j.speed = Math.max(16_384, perJob * jitter)

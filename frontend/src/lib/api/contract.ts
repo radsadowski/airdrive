@@ -197,7 +197,6 @@ export interface Settings {
   theme: 'dark' | 'light'
   defaultView: 'list' | 'grid'
   concurrentTransfers: number
-  bandwidthLimitMbps: number
   showHiddenFiles: boolean
   downloadDir: string
 }
@@ -329,6 +328,8 @@ export interface ApiClient {
   addS3Location(cfg: S3LocationConfig): Promise<Location>
   removeLocation(locationId: string): Promise<void>
   refreshLocation(locationId: string): Promise<void>
+  /** native folder picker; null when the user cancels */
+  pickFolder(): Promise<string | null>
   /** used by the Drive / S3 wizards to validate a connection before adding */
   testS3Connection(cfg: S3LocationConfig): Promise<{ ok: boolean; buckets: string[]; error?: string }>
 

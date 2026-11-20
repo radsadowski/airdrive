@@ -294,6 +294,11 @@ class MockClient implements ApiClient {
     runFakeCrawl(this.state, bus, locationId, Math.max(50, Math.round(loc.fileCount * 0.02)), 2200)
   }
 
+  async pickFolder(): Promise<string | null> {
+    await this.net('localfs', 120)
+    return '/Users/you/Downloads/airdrive'
+  }
+
   /* ---- files ---- */
 
   async listDir(locationId: string, dirId: string | null, opts?: Parameters<ApiClient['listDir']>[2]) {

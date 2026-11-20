@@ -49,9 +49,9 @@ func newSyncE2E(t *testing.T) *syncE2E {
 	require.NoError(t, db.UpsertLocation(context.Background(), index.Location{ID: "LB", Kind: provider.KindLocalFS, Name: "B", Root: rootB}))
 
 	transfers := NewTransferService(db, registry, logger, func() TransferSettings {
-		return TransferSettings{ConcurrentTransfers: 2, BandwidthLimitMbps: 0}
+		return TransferSettings{ConcurrentTransfers: 2}
 	})
-	files := NewFileService(nil, db, registry, logger)
+	files := NewFileService(nil, db, registry, logger, nil)
 	engine := NewSyncEngine(db, registry, transfers, files, logger, nil)
 	svc := NewSyncService(db, registry, logger)
 	svc.SetReconcile(engine.ReconcileHook())

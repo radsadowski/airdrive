@@ -55,7 +55,7 @@ func newOpTestService(t *testing.T, ctrl *gomock.Controller) (*FileService, *moc
 	registry.Register("L1", p)
 
 	rec := &opEventRecorder{}
-	svc := NewFileService(nil, db, registry, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	svc := NewFileService(nil, db, registry, slog.New(slog.NewTextHandler(io.Discard, nil)), nil)
 	svc.emit = rec.record
 	return svc, p, rec
 }

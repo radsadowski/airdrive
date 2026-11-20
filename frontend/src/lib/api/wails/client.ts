@@ -7,6 +7,7 @@
 import { Events } from '@wailsio/runtime'
 import type { ApiClient, AppEventMap, AppEventName, EventBus, FileInfo, GdriveSession, Location, LocationHealth, Page, S3LocationConfig, Settings } from '../contract'
 import * as LocSvc from '@bindings/github.com/radosny/airdrive/internal/bridge/locationservice'
+import * as AppSvc from '@bindings/github.com/radosny/airdrive/internal/bridge/appservice'
 import * as FileSvc from '@bindings/github.com/radosny/airdrive/internal/bridge/fileservice'
 import * as XferSvc from '@bindings/github.com/radosny/airdrive/internal/bridge/transferservice'
 import * as SettingsSvc from '@bindings/github.com/radosny/airdrive/internal/bridge/settingsservice'
@@ -182,6 +183,11 @@ class WailsClientImpl implements ApiClient, EventBus {
 
   async refreshLocation(locationId: string): Promise<void> {
     await LocSvc.RefreshLocation(locationId)
+  }
+
+  async pickFolder(): Promise<string | null> {
+    const chosen = await AppSvc.PickFolder()
+    return chosen || null
   }
 
   async testS3Connection(cfg: S3LocationConfig): Promise<{ ok: boolean; buckets: string[]; error?: string }> {

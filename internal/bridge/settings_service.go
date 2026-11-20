@@ -65,9 +65,6 @@ func (s *SettingsService) Update(patch map[string]any) (entities.Settings, error
 	if v, ok := patch["concurrentTransfers"].(float64); ok {
 		cur.ConcurrentTransfers = int(v)
 	}
-	if v, ok := patch["bandwidthLimitMbps"].(float64); ok {
-		cur.BandwidthLimitMbps = int(v)
-	}
 	if v, ok := patch["showHiddenFiles"].(bool); ok {
 		cur.ShowHiddenFiles = v
 	}
@@ -85,9 +82,19 @@ func defaultSettings() entities.Settings {
 		Theme:               "dark",
 		DefaultView:         "list",
 		ConcurrentTransfers: 3,
-		BandwidthLimitMbps:  80,
 		ShowHiddenFiles:     false,
+		DownloadDir:         defaultDownloadDir(),
 	}
+}
+
+// defaultDownloadDir is the macOS Downloads folder, used until the user picks
+// another one.
+func defaultDownloadDir() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, "Downloads")
 }
 
 func (s *SettingsService) read() (entities.Settings, error) {
@@ -98,6 +105,9 @@ func (s *SettingsService) read() (entities.Settings, error) {
 	var out entities.Settings
 	if err := json.Unmarshal(b, &out); err != nil {
 		return defaultSettings(), fmt.Errorf("settings: parse: %w", err)
+	}
+	if out.DownloadDir == "" {
+		out.DownloadDir = defaultDownloadDir()
 	}
 	return out, nil
 }

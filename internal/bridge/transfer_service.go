@@ -28,7 +28,6 @@ import (
 // TransferSettings is read live so panel changes apply mid-batch.
 type TransferSettings struct {
 	ConcurrentTransfers int
-	BandwidthLimitMbps  int
 }
 
 // TransferService moves bytes between locations.
@@ -53,7 +52,7 @@ func NewTransferService(db *index.DB, registry *provider.Registry, logger *slog.
 		logger = slog.Default()
 	}
 	if settings == nil {
-		settings = func() TransferSettings { return TransferSettings{ConcurrentTransfers: 3, BandwidthLimitMbps: 80} }
+		settings = func() TransferSettings { return TransferSettings{ConcurrentTransfers: 3} }
 	}
 	s := &TransferService{
 		db:       db,

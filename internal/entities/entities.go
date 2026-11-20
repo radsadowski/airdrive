@@ -89,7 +89,6 @@ type Settings struct {
 	Theme               string `json:"theme"`
 	DefaultView         string `json:"defaultView"`
 	ConcurrentTransfers int    `json:"concurrentTransfers"`
-	BandwidthLimitMbps  int    `json:"bandwidthLimitMbps"`
 	ShowHiddenFiles     bool   `json:"showHiddenFiles"`
 	DownloadDir         string `json:"downloadDir"`
 }
