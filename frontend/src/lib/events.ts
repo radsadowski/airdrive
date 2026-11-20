@@ -9,6 +9,7 @@ import { useAppStore } from '@/stores/app'
 import { useSyncStore } from '@/stores/sync'
 import { useTransfersStore } from '@/stores/transfers'
 import { useOpsStore } from '@/stores/ops'
+import { useLogsStore } from '@/stores/logs'
 import { useUiStore } from '@/stores/ui'
 
 export function wireEvents(): () => void {
@@ -63,6 +64,10 @@ export function wireEvents(): () => void {
 
     api.on('sync:progress', (p) => {
       useSyncStore.getState().applyProgress(p)
+    }),
+
+    api.on('log:line', (line) => {
+      useLogsStore.getState().append(line)
     }),
 
     api.on('fileop:progress', (p) => {

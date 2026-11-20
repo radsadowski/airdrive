@@ -91,6 +91,7 @@ type Settings struct {
 	ConcurrentTransfers int    `json:"concurrentTransfers"`
 	ShowHiddenFiles     bool   `json:"showHiddenFiles"`
 	DownloadDir         string `json:"downloadDir"`
+	DebugLog            bool   `json:"debugLog"`
 }
 
 // SyncPair is the UI-facing projection of one sync policy row.

@@ -17,4 +17,5 @@ const (
 	SyncUpdated       = "sync:updated"
 	SyncProgress      = "sync:progress"
 	FileOpProgress    = "fileop:progress"
+	LogLine           = "log:line"
 )

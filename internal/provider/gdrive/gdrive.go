@@ -44,10 +44,12 @@ func New(ctx context.Context, locationID string, ts oauth2.TokenSource, logger *
 	if logger == nil {
 		logger = slog.Default()
 	}
+	retry := newRetryTransport()
+	retry.base = provider.NewLogTransport(http.DefaultTransport, logger)
 	client := &http.Client{
 		Transport: &oauth2.Transport{
 			Source: ts,
-			Base:   newRetryTransport(),
+			Base:   retry,
 		},
 	}
 	svc, err := drive.NewService(ctx, append([]option.ClientOption{option.WithHTTPClient(client)}, opts...)...)

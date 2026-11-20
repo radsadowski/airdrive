@@ -24,6 +24,13 @@ export function Get(): $CancellablePromise<entities$0.Settings> {
 }
 
 /**
+ * SetOnChange registers a callback invoked after every successful update.
+ */
+export function SetOnChange(fn: any): $CancellablePromise<void> {
+    return $Call.ByID(3661197122, fn);
+}
+
+/**
  * Update applies a patch and persists atomically.
  */
 export function Update(patch: { [_ in string]?: any }): $CancellablePromise<entities$0.Settings> {

@@ -126,6 +126,7 @@ func New(locationID string, cfg Config, creds Credentials, logger *slog.Logger) 
 		Secure:       secure,
 		Region:       cfg.Region,
 		BucketLookup: lookup,
+		Transport:    provider.NewLogTransport(nil, logger),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("s3compat: client: %w", err)

@@ -221,6 +221,10 @@ make mocks    # regenerate gomock mocks after interface changes
 make test     # go test -race ./...
 ```
 
+Debug log: Settings → Debug log streams file operations, transfers, crawls and
+HTTP request/response lines into a panel at the bottom of the window. It is off
+by default, and stderr carries the same records while it is on.
+
 ### 🧪 Testing
 
 Table-driven, parallel, and asserted via `require` + gomock generated

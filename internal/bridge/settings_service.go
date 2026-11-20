@@ -15,9 +15,17 @@ import (
 
 // SettingsService reads and writes app settings.
 type SettingsService struct {
-	mu     sync.Mutex
-	path   string
-	logger *slog.Logger
+	mu       sync.Mutex
+	path     string
+	logger   *slog.Logger
+	onChange func(entities.Settings)
+}
+
+// SetOnChange registers a callback invoked after every successful update.
+func (s *SettingsService) SetOnChange(fn func(entities.Settings)) {
+	s.mu.Lock()
+	s.onChange = fn
+	s.mu.Unlock()
 }
 
 // NewSettingsService creates the service; the settings file is created with
@@ -51,9 +59,9 @@ func (s *SettingsService) Get() (entities.Settings, error) {
 // Update applies a patch and persists atomically.
 func (s *SettingsService) Update(patch map[string]any) (entities.Settings, error) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	cur, err := s.read()
 	if err != nil {
+		s.mu.Unlock()
 		return cur, err
 	}
 	if v, ok := patch["theme"].(string); ok {
@@ -71,8 +79,17 @@ func (s *SettingsService) Update(patch map[string]any) (entities.Settings, error
 	if v, ok := patch["downloadDir"].(string); ok {
 		cur.DownloadDir = v
 	}
-	if err := s.write(cur); err != nil {
-		return cur, err
+	if v, ok := patch["debugLog"].(bool); ok {
+		cur.DebugLog = v
+	}
+	writeErr := s.write(cur)
+	onChange := s.onChange
+	s.mu.Unlock()
+	if writeErr != nil {
+		return cur, writeErr
+	}
+	if onChange != nil {
+		onChange(cur)
 	}
 	return cur, nil
 }

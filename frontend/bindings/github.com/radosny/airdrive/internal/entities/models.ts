@@ -373,6 +373,7 @@ export class Settings {
     "concurrentTransfers": number;
     "showHiddenFiles": boolean;
     "downloadDir": string;
+    "debugLog": boolean;
 
     /** Creates a new Settings instance. */
     constructor($$source: Partial<Settings> = {}) {
@@ -390,6 +391,9 @@ export class Settings {
         }
         if (!("downloadDir" in $$source)) {
             this["downloadDir"] = "";
+        }
+        if (!("debugLog" in $$source)) {
+            this["debugLog"] = false;
         }
 
         Object.assign(this, $$source);

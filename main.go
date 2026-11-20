@@ -12,8 +12,10 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 
 	"github.com/radosny/airdrive/internal/bridge"
+	"github.com/radosny/airdrive/internal/entities"
 	ev "github.com/radosny/airdrive/internal/events"
 	"github.com/radosny/airdrive/internal/index"
+	"github.com/radosny/airdrive/internal/logstream"
 	"github.com/radosny/airdrive/internal/provider"
 	"github.com/radosny/airdrive/internal/version"
 	"github.com/radosny/airdrive/internal/watcher"
@@ -34,10 +36,12 @@ func init() {
 	application.RegisterEvent[map[string]any](ev.SyncUpdated)
 	application.RegisterEvent[map[string]any](ev.SyncProgress)
 	application.RegisterEvent[map[string]any](ev.FileOpProgress)
+	application.RegisterEvent[map[string]any](ev.LogLine)
 }
 
 func main() {
-	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	logSink := logstream.NewSink()
+	logger := slog.New(logSink.Handler(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: logSink.Level()})))
 
 	// Open the SQLite index (or create it on first run).
 	dataDir, err := dataDirectory()
@@ -62,6 +66,11 @@ func main() {
 	if err != nil {
 		log.Fatal("settings:", err)
 	}
+	applyDebug := func(cfg entities.Settings) { logSink.SetDebug(cfg.DebugLog) }
+	if cfg, sErr := settingsSvc.Get(); sErr == nil {
+		applyDebug(cfg)
+	}
+	settingsSvc.SetOnChange(applyDebug)
 	transfers := bridge.NewTransferService(db, registry, logger, func() bridge.TransferSettings {
 		cfg, cErr := settingsSvc.Get()
 		if cErr != nil {
@@ -127,6 +136,7 @@ func main() {
 	})
 
 	// Inject the real app reference now that it exists.
+	logSink.SetEmit(func(name string, data ...any) { app.Event.Emit(name, data...) })
 	appRef = app
 	appSvc.SetApp(app)
 	locSvc.SetApp(app)

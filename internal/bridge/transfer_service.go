@@ -196,6 +196,7 @@ func (s *TransferService) startJob(j index.TransferJob) {
 // runJob executes one transfer job: conflict check, dir creation, streaming,
 // verification, dest index update, and batch-completion detection.
 func (s *TransferService) runJob(j index.TransferJob) {
+	s.logger.Debug("transfer job", "path", j.DestPath, "source", j.SourceLocID, "dest", j.DestLocID, "bytes", j.BytesTotal)
 	ctx := context.Background()
 	if err := s.runJobInner(ctx, j); err != nil {
 		s.logger.Warn("transfer: job failed", "id", j.ID, "err", err)
@@ -204,6 +205,7 @@ func (s *TransferService) runJob(j index.TransferJob) {
 		}
 		s.emitJob(j.ID, j.BatchID, stateFailed, j.BytesDone, j.BytesTotal, 0)
 	}
+	s.logger.Debug("transfer job finished", "path", j.DestPath)
 	s.checkBatchCompletion(j.BatchID)
 }
 

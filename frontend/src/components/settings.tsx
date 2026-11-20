@@ -110,6 +110,15 @@ export function SettingsDialog() {
           <Row label="Show hidden files" hint="dotfiles & .DS_Store noise">
             <Switch checked={settings.showHiddenFiles} onCheckedChange={(v) => void patch({ showHiddenFiles: v })} />
           </Row>
+          <Row label="Debug log" hint="stream file operations and HTTP calls into the log panel">
+            <Switch
+              checked={settings.debugLog}
+              onCheckedChange={(v) => {
+                void patch({ debugLog: v })
+                useUiStore.getState().setLogsOpen(v)
+              }}
+            />
+          </Row>
         </div>
 
         <div className="border-t border-hairline px-5 py-2.5">

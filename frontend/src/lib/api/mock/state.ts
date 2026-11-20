@@ -29,6 +29,7 @@ const DEFAULT_SETTINGS: Settings = {
   concurrentTransfers: 3,
   showHiddenFiles: false,
   downloadDir: '/Users/you/Downloads',
+  debugLog: false,
 }
 
 export function sortComparator(spec: SortSpec): (a: FileInfo, b: FileInfo) => number {

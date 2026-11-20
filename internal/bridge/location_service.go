@@ -232,6 +232,7 @@ func (s *LocationService) crawl(locationID string, p provider.StorageProvider) {
 		cursor = ""
 	}
 
+	s.logger.Debug("crawl start", "location", locationID, "cursor", cursor)
 	newCursor, err := p.SyncChanges(context.Background(), locationID, cursor, func(batch []provider.ChangeEvent) {
 		for _, change := range batch {
 			switch change.Kind {
@@ -251,6 +252,7 @@ func (s *LocationService) crawl(locationID string, p provider.StorageProvider) {
 			}
 			done++
 		}
+		s.logger.Debug("crawl batch", "location", locationID, "changes", len(batch), "done", done)
 		s.emit(ev.IndexProgress, map[string]any{
 			"locationId": locationID,
 			"filesDone":  done,

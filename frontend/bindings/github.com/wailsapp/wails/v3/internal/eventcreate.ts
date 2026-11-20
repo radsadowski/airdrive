@@ -13,6 +13,7 @@ function configure() {
         "fs:changed": $$createType0,
         "index:progress": $$createType0,
         "location:status": $$createType0,
+        "log:line": $$createType0,
         "sync:progress": $$createType0,
         "sync:updated": $$createType0,
         "toast:show": $$createType0,

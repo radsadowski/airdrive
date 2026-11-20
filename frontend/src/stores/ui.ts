@@ -22,6 +22,7 @@ interface UiState {
   reconnectPrompt: { locationId: string; name: string; error: string } | null
   /** confirmation prompt before cancelling a running file operation */
   cancelPrompt: { opId: string; label: string } | null
+  logsOpen: boolean
 
   pushToast: (t: Omit<ToastPayload, 'id'>) => void
   dismissToast: (id: string) => void
@@ -42,6 +43,7 @@ interface UiState {
   resolveReconnect: (locationId: string) => void
   askCancelOp: (p: { opId: string; label: string }) => void
   dismissCancelOp: () => void
+  setLogsOpen: (open: boolean) => void
 }
 
 let toastSeq = 0
@@ -62,11 +64,13 @@ export const useUiStore = create<UiState>((set, get) => ({
     concurrentTransfers: 3,
     showHiddenFiles: false,
     downloadDir: '/Users/you/Downloads',
+    debugLog: false,
   },
   transferPicker: null,
   clipboard: null,
   reconnectPrompt: null,
   cancelPrompt: null,
+  logsOpen: false,
 
   pushToast(t) {
     const id = `toast_${Date.now()}_${toastSeq++}`
@@ -149,6 +153,10 @@ export const useUiStore = create<UiState>((set, get) => ({
 
   dismissCancelOp() {
     set({ cancelPrompt: null })
+  },
+
+  setLogsOpen(open) {
+    set({ logsOpen: open })
   },
 }))
 

@@ -95,6 +95,10 @@ class MockClient implements ApiClient {
     this.cancelledOps.add(opId)
   }
 
+  private emitLog(msg: string, attrs?: Record<string, string>): void {
+    bus.emit('log:line', { time: new Date().toISOString(), level: 'DEBUG', msg, attrs })
+  }
+
   private emitOp(
     opId: string,
     op: 'delete' | 'move',
@@ -363,6 +367,7 @@ class MockClient implements ApiClient {
     const sizes = fileIds.map((id) => this.subtreeIds(id).length)
     const total = sizes.reduce((a, n) => a + n, 0)
     let done = 0
+    this.emitLog('file op start', { op: 'move', items: String(fileIds.length), entries: String(total) })
     this.emitOp(opId, 'move', locationId, 0, total, 'running', fileIds[0] ? this.displayPath(fileIds[0]) : undefined)
     for (const [index, id] of fileIds.entries()) {
       const n = this.state.node(id)
@@ -389,6 +394,7 @@ class MockClient implements ApiClient {
       }
       done += sizes[index]
       const nextPath = fileIds[index + 1] ? this.displayPath(fileIds[index + 1]) : this.displayPath(id)
+      this.emitLog('file op item', { op: 'move', path: nextPath })
       this.emitOp(opId, 'move', locationId, done, total, 'running', nextPath)
     }
     for (const d of touchedOld) this.touch(locationId, d)
@@ -404,6 +410,7 @@ class MockClient implements ApiClient {
     const sizes = fileIds.map((id) => this.subtreeIds(id).length)
     const total = sizes.reduce((a, n) => a + n, 0)
     let done = 0
+    this.emitLog('file op start', { op: 'delete', items: String(fileIds.length), entries: String(total) })
     this.emitOp(opId, 'delete', locationId, 0, total, 'running', fileIds[0] ? this.displayPath(fileIds[0]) : undefined)
     for (const [index, id] of fileIds.entries()) {
       const n = this.state.node(id)
@@ -418,6 +425,7 @@ class MockClient implements ApiClient {
       }
       done += sizes[index]
       const nextPath = fileIds[index + 1] ? this.displayPath(fileIds[index + 1]) : this.displayPath(id)
+      this.emitLog('file op item', { op: 'delete', path: nextPath })
       this.emitOp(opId, 'delete', locationId, done, total, 'running', nextPath)
     }
     this.emitOp(opId, 'delete', locationId, total, total, 'done')

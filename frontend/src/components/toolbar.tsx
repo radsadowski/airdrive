@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, LayoutGrid, List, Search, FolderPlus, ArrowUpDown } from 'lucide-react'
+import { ChevronLeft, ChevronRight, LayoutGrid, List, Search, FolderPlus, ArrowUpDown, Terminal } from 'lucide-react'
 import type { SortField, SortSpec } from '@/lib/api/contract'
 import { useAppStore } from '@/stores/app'
 import { useUiStore } from '@/stores/ui'
@@ -36,6 +36,9 @@ export function Toolbar() {
   const selection = useAppStore((s) => s.selection)
   const items = useAppStore((s) => s.items)
   const setSearchOpen = useUiStore((s) => s.setSearchOpen)
+  const debugLog = useUiStore((s) => s.settings.debugLog)
+  const logsOpen = useUiStore((s) => s.logsOpen)
+  const setLogsOpen = useUiStore((s) => s.setLogsOpen)
   const hasLocation = useAppStore((s) => s.currentLocationId !== null)
 
   return (
@@ -129,6 +132,13 @@ export function Toolbar() {
 
       <div className="mx-0.5 h-4 w-px bg-hairline" />
 
+      {debugLog && (
+        <Tooltip label={logsOpen ? 'Hide debug log' : 'Debug log'} side="bottom">
+          <Button variant={logsOpen ? 'secondary' : 'ghost'} size="icon" onClick={() => setLogsOpen(!logsOpen)}>
+            <Terminal />
+          </Button>
+        </Tooltip>
+      )}
       <Button variant="ghost" size="icon" onClick={() => setView(view === 'list' ? 'grid' : 'list')}>
         {view === 'list' ? <LayoutGrid /> : <List />}
       </Button>

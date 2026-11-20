@@ -199,6 +199,8 @@ export interface Settings {
   concurrentTransfers: number
   showHiddenFiles: boolean
   downloadDir: string
+  /** stream the Go debug log into the UI log panel */
+  debugLog: boolean
 }
 
 /* ------------------------------------------------------------------ */
@@ -227,6 +229,7 @@ export interface AppEventMap {
     speed: number
   }
   'transfer:batchDone': { batchId: string; done: number; skipped: number; failed: number }
+  'log:line': { time: string; level: string; msg: string; attrs?: Record<string, string> }
   'fileop:progress': {
     opId: string
     op: 'delete' | 'move'

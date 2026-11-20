@@ -221,6 +221,7 @@ func (s *FileService) MoveWithin(locationID string, fileIDs []string, destDirID 
 	var failed atomic.Bool
 	var mu sync.Mutex
 	var firstErr error
+	s.logger.Debug("file op start", "op", opMove, "location", locationID, "items", len(targets), "entries", total)
 	s.emitOp(opID, opMove, locationID, 0, total, opRunning, targets[0].path, "")
 
 	var wg sync.WaitGroup
@@ -293,6 +294,7 @@ func (s *FileService) MoveWithin(locationID string, fileIDs []string, destDirID 
 		}
 		return fmt.Errorf("move: %w", err)
 	}
+	s.logger.Debug("file op done", "op", opMove, "location", locationID, "entries", total)
 	s.emitOp(opID, opMove, locationID, total, total, opDone, "", "")
 	s.emitFsChanged(locationID, destDirID)
 	return nil
@@ -411,6 +413,7 @@ func (s *FileService) DeleteFiles(locationID string, fileIDs []string) error {
 	var failed atomic.Bool
 	var mu sync.Mutex
 	var firstErr error
+	s.logger.Debug("file op start", "op", opDelete, "location", locationID, "items", len(targets), "entries", total)
 	s.emitOp(opID, opDelete, locationID, 0, total, opRunning, targets[0].path, "")
 
 	var wg sync.WaitGroup
@@ -480,6 +483,7 @@ func (s *FileService) DeleteFiles(locationID string, fileIDs []string) error {
 		}
 		return fmt.Errorf("delete: %w", err)
 	}
+	s.logger.Debug("file op done", "op", opDelete, "location", locationID, "entries", total)
 	s.emitOp(opID, opDelete, locationID, total, total, opDone, "", "")
 	for parent := range parents {
 		s.emitFsChanged(locationID, parent)
