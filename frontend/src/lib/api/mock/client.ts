@@ -75,6 +75,20 @@ class MockClient implements ApiClient {
     this.state.loadPreset(PRESETS[3], PRESETS[3].seed)
   }
 
+  private subtreeIds(id: string): string[] {
+    const out = [id]
+    const stack = [id]
+    while (stack.length > 0) {
+      const kids = this.state.children.get(stack.pop() as string)
+      if (!kids) continue
+      for (const k of kids) {
+        out.push(k)
+        stack.push(k)
+      }
+    }
+    return out
+  }
+
   private emitOp(
     opId: string,
     op: 'delete' | 'move',
@@ -82,8 +96,9 @@ class MockClient implements ApiClient {
     done: number,
     total: number,
     state: 'running' | 'done' | 'error',
+    current?: string,
   ): void {
-    bus.emit('fileop:progress', { opId, op, locationId, done, total, state })
+    bus.emit('fileop:progress', { opId, op, locationId, done, total, state, current })
   }
 
   private async net(kind: Location['kind'], baseMs: number): Promise<void> {
@@ -322,8 +337,10 @@ class MockClient implements ApiClient {
     await this.net(kind, 220)
     const touchedOld = new Set<string | null>()
     const opId = nextId('op')
-    const total = fileIds.length
-    this.emitOp(opId, 'move', locationId, 0, total, 'running')
+    const sizes = fileIds.map((id) => this.subtreeIds(id).length)
+    const total = sizes.reduce((a, n) => a + n, 0)
+    let done = 0
+    this.emitOp(opId, 'move', locationId, 0, total, 'running', fileIds[0] ? this.state.node(fileIds[0]).name : undefined)
     for (const [index, id] of fileIds.entries()) {
       const n = this.state.node(id)
       const oldParent = n.parentId
@@ -341,7 +358,9 @@ class MockClient implements ApiClient {
       if (arr2) arr2.push(id)
       else this.state.children.set(key, [id])
       await sleep(90)
-      this.emitOp(opId, 'move', locationId, index + 1, total, 'running')
+      done += sizes[index]
+      const nextName = fileIds[index + 1] ? this.state.node(fileIds[index + 1]).name : n.name
+      this.emitOp(opId, 'move', locationId, done, total, 'running', nextName)
     }
     for (const d of touchedOld) this.touch(locationId, d)
     this.touch(locationId, destDirId)
@@ -353,14 +372,18 @@ class MockClient implements ApiClient {
     await this.net(kind, 180)
     const touchedDirs = new Set<string | null>()
     const opId = nextId('op')
-    const total = fileIds.length
-    this.emitOp(opId, 'delete', locationId, 0, total, 'running')
+    const sizes = fileIds.map((id) => this.subtreeIds(id).length)
+    const total = sizes.reduce((a, n) => a + n, 0)
+    let done = 0
+    this.emitOp(opId, 'delete', locationId, 0, total, 'running', fileIds[0] ? this.state.node(fileIds[0]).name : undefined)
     for (const [index, id] of fileIds.entries()) {
       const n = this.state.node(id)
       touchedDirs.add(n.parentId)
-      n.trashed = true
+      for (const sid of this.subtreeIds(id)) this.state.node(sid).trashed = true
       await sleep(90)
-      this.emitOp(opId, 'delete', locationId, index + 1, total, 'running')
+      done += sizes[index]
+      const nextName = fileIds[index + 1] ? this.state.node(fileIds[index + 1]).name : n.name
+      this.emitOp(opId, 'delete', locationId, done, total, 'running', nextName)
     }
     this.emitOp(opId, 'delete', locationId, total, total, 'done')
     for (const d of touchedDirs) this.touch(locationId, d)

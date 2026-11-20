@@ -73,10 +73,11 @@ export function ActivityBar() {
     const speed = activeBatches.reduce((a, b) => a + b.speed, 0)
     const single = activeBatches.length === 1 ? activeBatches[0] : null
     const Icon = single ? TRANSFER_ICON[single.action] : Copy
+    const running = activeBatches.flatMap((b) => b.jobs).find((j) => j.state === 'running')
     items.push({
       key: 'transfer',
       label: single
-        ? `${TRANSFER_LABEL[single.action]} ${single.jobs.length} item${single.jobs.length !== 1 ? 's' : ''}`
+        ? `${TRANSFER_LABEL[single.action]} ${single.jobs.length} item${single.jobs.length !== 1 ? 's' : ''}${running ? ` · ${running.destPath || running.sourceName}` : ''}`
         : `${activeBatches.length} transfers`,
       detail: `${bytesTotal > 0 ? `${formatBytes(bytesDone)} / ${formatBytes(bytesTotal)}` : `${done}/${jobs}`}${speed > 0 ? ` · ${formatSpeed(speed)}` : ''}`,
       value: bytesTotal > 0 ? bytesDone / bytesTotal : jobs > 0 ? done / jobs : 0,
@@ -86,9 +87,10 @@ export function ActivityBar() {
   }
 
   for (const op of Object.values(ops)) {
+    const verb = op.op === 'delete' ? 'Moving to Trash' : 'Moving'
     items.push({
       key: `op:${op.opId}`,
-      label: op.op === 'delete' ? 'Moving to Trash' : 'Moving',
+      label: op.current ? `${verb} · ${op.current}` : verb,
       detail: `${op.done}/${op.total}${op.state === 'error' ? ' · failed' : ''}`,
       value: op.total > 0 ? op.done / op.total : 0,
       tone: op.state === 'error' ? 'danger' : op.state === 'done' ? 'success' : 'amber',

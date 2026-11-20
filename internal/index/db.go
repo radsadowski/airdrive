@@ -343,6 +343,21 @@ func (d *DB) DeleteTree(ctx context.Context, locationID, fileID string) error {
 	return err
 }
 
+// CountSubtree returns how many indexed rows a file or directory and its
+// descendants cover, so a folder operation can report its real scope.
+func (d *DB) CountSubtree(ctx context.Context, locationID, fileID string) (int, error) {
+	var n int
+	err := d.db.QueryRowContext(ctx, `
+		WITH RECURSIVE subtree(id) AS (
+			SELECT id FROM files WHERE location_id=? AND id=?
+			UNION
+			SELECT f.id FROM files f JOIN subtree s ON f.parent_id = s.id WHERE f.location_id=?
+		)
+		SELECT COUNT(*) FROM subtree`,
+		locationID, fileID, locationID).Scan(&n)
+	return n, err
+}
+
 // FileByID returns a single file of a location or sql.ErrNoRows.
 func (d *DB) FileByID(ctx context.Context, locationID, fileID string) (provider.FileInfo, error) {
 	row := d.db.QueryRowContext(ctx,

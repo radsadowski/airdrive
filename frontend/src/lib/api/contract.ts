@@ -235,6 +235,8 @@ export interface AppEventMap {
     done: number
     total: number
     state: 'running' | 'done' | 'error'
+    /** the item or path currently being processed */
+    current?: string
     error?: string
   }
   'location:status': { locationId: string; state: LocationStatus; error?: string }

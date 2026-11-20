@@ -130,3 +130,37 @@ func TestWhenFilesMoveWithinALocationThenProgressTicksForEveryItem(t *testing.T)
 	r.Equal(2, events[3]["done"])
 	r.Equal(opDone, events[3]["state"])
 }
+
+func seedOpEntry(t *testing.T, svc *FileService, id, parent string, kind provider.FileKind) {
+	t.Helper()
+	require.NoError(t, svc.db.UpsertFile(context.Background(), provider.FileInfo{
+		ID:         id,
+		LocationID: "L1",
+		ParentID:   parent,
+		Name:       id,
+		Kind:       kind,
+		MIME:       "text/plain",
+	}))
+}
+
+func TestWhenADirectoryIsDeletedThenProgressReportsTheWholeSubtree(t *testing.T) {
+	t.Parallel()
+	r := require.New(t)
+	ctrl := gomock.NewController(t)
+	svc, p, rec := newOpTestService(t, ctrl)
+
+	seedOpEntry(t, svc, "d1", "", provider.FileKindDir)
+	seedOpEntry(t, svc, "d1/a", "d1", provider.FileKindFile)
+	seedOpEntry(t, svc, "d1/b", "d1", provider.FileKindFile)
+	seedOpEntry(t, svc, "d1/c", "d1", provider.FileKindFile)
+	p.EXPECT().Delete(gomock.Any(), "L1", []string{"d1"}).Return(nil)
+
+	r.NoError(svc.DeleteFiles("L1", []string{"d1"}))
+
+	events := rec.snapshot()
+	r.Len(events, 3, "start, one step for the renamed subtree, done")
+	r.Equal(4, events[0]["total"], "the folder plus its three children")
+	r.Equal("d1", events[0]["current"])
+	r.Equal(4, events[1]["done"])
+	r.Equal(opDone, events[2]["state"])
+}

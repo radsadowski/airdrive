@@ -131,69 +131,122 @@ func (s *FileService) Rename(locationID, fileID, newName string) (*entities.File
 }
 
 // MoveWithin moves files to another directory within the same location,
-// reporting per-item progress so a cut and paste shows movement in the
-// activity bar instead of completing silently.
+// reporting the indexed scope of each selected item. A folder is renamed as
+// one provider primitive, so its step lands when the whole subtree moved.
 func (s *FileService) MoveWithin(locationID string, fileIDs []string, destDirID string) error {
 	p, err := s.provider(locationID)
 	if err != nil {
 		return err
 	}
+	ctx := context.Background()
+	targets := s.opTargets(ctx, locationID, fileIDs)
+	if len(targets) == 0 {
+		return nil
+	}
+	total := 0
+	for _, t := range targets {
+		total += t.count
+	}
 	oldParents := map[string]string{}
-	for _, id := range fileIDs {
-		if f, err := s.db.FileByID(context.Background(), locationID, id); err == nil {
-			oldParents[id] = f.ParentID
+	for _, t := range targets {
+		if f, err := s.db.FileByID(ctx, locationID, t.id); err == nil {
+			oldParents[t.id] = f.ParentID
 		}
 	}
 	opID := uuid.NewString()
-	total := len(fileIDs)
-	s.emitOp(opID, opMove, locationID, 0, total, opRunning, "")
-	for i, id := range fileIDs {
-		if err := p.MoveWithin(context.Background(), locationID, []string{id}, destDirID); err != nil {
-			s.emitOp(opID, opMove, locationID, i, total, opError, err.Error())
+	done := 0
+	s.emitOp(opID, opMove, locationID, 0, total, opRunning, targets[0].name, "")
+	for i, t := range targets {
+		if err := p.MoveWithin(ctx, locationID, []string{t.id}, destDirID); err != nil {
+			s.emitOp(opID, opMove, locationID, done, total, opError, t.name, err.Error())
 			return fmt.Errorf("move: %w", err)
 		}
-		newPath := filepath.Join(destDirID, filepath.Base(id))
-		_ = s.db.DeleteFile(context.Background(), locationID, id)
-		if f, err := p.Stat(context.Background(), locationID, newPath); err == nil {
-			_ = s.db.UpsertFile(context.Background(), f)
+		newPath := filepath.Join(destDirID, filepath.Base(t.id))
+		_ = s.db.DeleteFile(ctx, locationID, t.id)
+		if f, err := p.Stat(ctx, locationID, newPath); err == nil {
+			_ = s.db.UpsertFile(ctx, f)
 		}
-		if old, ok := oldParents[id]; ok {
+		if old, ok := oldParents[t.id]; ok {
 			s.emitFsChanged(locationID, old)
 		}
-		s.emitOp(opID, opMove, locationID, i+1, total, opRunning, "")
+		done += t.count
+		next := t.name
+		if i+1 < len(targets) {
+			next = targets[i+1].name
+		}
+		s.emitOp(opID, opMove, locationID, done, total, opRunning, next, "")
 	}
-	s.emitOp(opID, opMove, locationID, total, total, opDone, "")
+	s.emitOp(opID, opMove, locationID, total, total, opDone, "", "")
 	s.emitFsChanged(locationID, destDirID)
 	return nil
 }
 
+// opTarget is one selected item with the number of index rows it covers.
+type opTarget struct {
+	id    string
+	name  string
+	count int
+}
+
+// opTargets resolves selections to names and indexed subtree sizes, so a
+// folder operation reports the real scope instead of one opaque step.
+func (s *FileService) opTargets(ctx context.Context, locationID string, fileIDs []string) []opTarget {
+	targets := make([]opTarget, 0, len(fileIDs))
+	for _, id := range fileIDs {
+		t := opTarget{id: id, count: 1}
+		if f, err := s.db.FileByID(ctx, locationID, id); err == nil {
+			t.name = f.Name
+		}
+		if n, err := s.db.CountSubtree(ctx, locationID, id); err == nil && n > 0 {
+			t.count = n
+		}
+		targets = append(targets, t)
+	}
+	return targets
+}
+
 // DeleteFiles moves files to trash and removes them from the index, reporting
-// per-item progress so a large selection shows movement in the activity bar.
+// the indexed scope of each selected item so a folder delete shows how many
+// entries it covers and which one is in flight.
 func (s *FileService) DeleteFiles(locationID string, fileIDs []string) error {
 	p, err := s.provider(locationID)
 	if err != nil {
 		return err
 	}
+	ctx := context.Background()
+	targets := s.opTargets(ctx, locationID, fileIDs)
+	if len(targets) == 0 {
+		return nil
+	}
+	total := 0
+	for _, t := range targets {
+		total += t.count
+	}
 	parents := map[string]bool{}
-	for _, id := range fileIDs {
-		if f, err := s.db.FileByID(context.Background(), locationID, id); err == nil {
+	for _, t := range targets {
+		if f, err := s.db.FileByID(ctx, locationID, t.id); err == nil {
 			parents[f.ParentID] = true
 		}
 	}
 	opID := uuid.NewString()
-	total := len(fileIDs)
-	s.emitOp(opID, opDelete, locationID, 0, total, opRunning, "")
-	for i, id := range fileIDs {
-		if err := p.Delete(context.Background(), locationID, []string{id}); err != nil {
-			s.emitOp(opID, opDelete, locationID, i, total, opError, err.Error())
+	done := 0
+	s.emitOp(opID, opDelete, locationID, 0, total, opRunning, targets[0].name, "")
+	for i, t := range targets {
+		if err := p.Delete(ctx, locationID, []string{t.id}); err != nil {
+			s.emitOp(opID, opDelete, locationID, done, total, opError, t.name, err.Error())
 			return fmt.Errorf("delete: %w", err)
 		}
-		if dErr := s.db.DeleteTree(context.Background(), locationID, id); dErr != nil {
-			s.logger.Warn("delete file from index", "location", locationID, "id", id, "err", dErr)
+		if dErr := s.db.DeleteTree(ctx, locationID, t.id); dErr != nil {
+			s.logger.Warn("delete file from index", "location", locationID, "id", t.id, "err", dErr)
 		}
-		s.emitOp(opID, opDelete, locationID, i+1, total, opRunning, "")
+		done += t.count
+		next := t.name
+		if i+1 < len(targets) {
+			next = targets[i+1].name
+		}
+		s.emitOp(opID, opDelete, locationID, done, total, opRunning, next, "")
 	}
-	s.emitOp(opID, opDelete, locationID, total, total, opDone, "")
+	s.emitOp(opID, opDelete, locationID, total, total, opDone, "", "")
 	for parent := range parents {
 		s.emitFsChanged(locationID, parent)
 	}
@@ -261,7 +314,7 @@ func (s *FileService) emitFsChanged(locationID, dirID string) {
 }
 
 // emitOp reports progress for a file operation shown in the activity bar.
-func (s *FileService) emitOp(opID, op, locationID string, done, total int, state, errMsg string) {
+func (s *FileService) emitOp(opID, op, locationID string, done, total int, state, current, errMsg string) {
 	s.emit(ev.FileOpProgress, map[string]any{
 		"opId":       opID,
 		"op":         op,
@@ -269,6 +322,7 @@ func (s *FileService) emitOp(opID, op, locationID string, done, total int, state
 		"done":       done,
 		"total":      total,
 		"state":      state,
+		"current":    current,
 		"error":      errMsg,
 	})
 }
