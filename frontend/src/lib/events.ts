@@ -67,6 +67,7 @@ export function wireEvents(): () => void {
 
     api.on('fileop:progress', (p) => {
       useOpsStore.getState().apply(p)
+      if (p.state !== 'running') void useAppStore.getState().applyFsChange(p.locationId, null)
     }),
   ]
 

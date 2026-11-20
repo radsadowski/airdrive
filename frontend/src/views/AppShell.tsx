@@ -127,6 +127,17 @@ export function AppShell() {
     void useSyncStore.getState().load()
   }, [])
 
+  /* safety net: refresh the open folder while the window is visible */
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      const s = useAppStore.getState()
+      if (!s.currentLocationId) return
+      void s.refresh()
+    }, 15000)
+    return () => window.clearInterval(id)
+  }, [])
+
   /* probe the opened location so a dead sign-in is offered before any file op */
   useEffect(() => {
     if (!currentLocationId) return

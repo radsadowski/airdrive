@@ -68,6 +68,27 @@ function pushHistory(state: Pick<AppState, 'history' | 'historyIndex'>, entry: N
   return { history: next, historyIndex: next.length - 1 }
 }
 
+let refreshInFlight: Promise<void> | null = null
+let refreshQueued = false
+
+/** Coalesces refreshes: a request during a running refresh runs once more
+ *  after it, so bursts of fs:changed events are never dropped or overlapped. */
+function runCoalesced(run: () => Promise<void>): Promise<void> {
+  if (refreshInFlight) {
+    refreshQueued = true
+    return refreshInFlight
+  }
+  refreshInFlight = (async () => {
+    do {
+      refreshQueued = false
+      await run()
+    } while (refreshQueued)
+  })().finally(() => {
+    refreshInFlight = null
+  })
+  return refreshInFlight
+}
+
 export const useAppStore = create<AppState>((set, get) => ({
   locations: [],
   currentLocationId: null,
@@ -241,15 +262,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   async refresh() {
-    const { currentLocationId, dirId, sort } = get()
-    if (!currentLocationId) return
-    set({ loading: true, error: null })
-    try {
-      const page = await api.listDir(currentLocationId, dirId, { sort })
-      set({ items: page.items, cursor: page.cursor, loading: false })
-    } catch (e) {
-      set({ loading: false, error: toApiError(e).message })
-    }
+    return runCoalesced(async () => {
+      const { currentLocationId, dirId, sort } = get()
+      if (!currentLocationId) return
+      set({ loading: true, error: null })
+      try {
+        const page = await api.listDir(currentLocationId, dirId, { sort })
+        set({ items: page.items, cursor: page.cursor, loading: false })
+      } catch (e) {
+        set({ loading: false, error: toApiError(e).message })
+      }
+    })
   },
 
   async loadMore() {
@@ -274,12 +297,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   async applyFsChange(locationId, dirId) {
-    const { currentLocationId, dirId: openDirId, loading } = get()
+    const { currentLocationId, dirId: openDirId } = get()
     if (locationId !== currentLocationId) {
       void get().reloadLocations()
       return
     }
-    if (dirId === null || dirId === openDirId || loading) {
+    if (dirId === null || dirId === openDirId) {
       void get().refresh()
       void get().reloadLocations()
     }
