@@ -14,6 +14,7 @@ import (
 	"path"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -41,6 +42,9 @@ type TransferService struct {
 	wake chan struct{}
 	// dirCache memoizes dest dir creation: batchID+parentPath → destDirID
 	dirCache sync.Map
+	// running counts jobs in flight, so the dispatcher never exceeds
+	// ConcurrentTransfers no matter how long the queue is.
+	running atomic.Int64
 }
 
 // NewTransferService builds the engine; the dispatcher starts immediately.
@@ -150,12 +154,17 @@ func (s *TransferService) kickDispatcher() {
 
 func (s *TransferService) dispatcher() {
 	for range s.wake {
+	dispatch:
 		for {
 			max := s.settings().ConcurrentTransfers
 			if max < 1 {
 				max = 1
 			}
-			jobs, err := s.db.NextPendingJobs(context.Background(), max)
+			slots := max - int(s.running.Load())
+			if slots <= 0 {
+				break
+			}
+			jobs, err := s.db.NextPendingJobs(context.Background(), slots)
 			if err != nil {
 				s.logger.Warn("transfer: dispatch", "err", err)
 				break
@@ -166,14 +175,23 @@ func (s *TransferService) dispatcher() {
 			for _, j := range jobs {
 				if err := s.db.UpdateTransferJobState(context.Background(), j.ID, stateRunning, false, ""); err != nil {
 					s.logger.Warn("transfer: mark running", "id", j.ID, "err", err)
+					break dispatch
 				}
-				go s.runJob(j)
-			}
-			if len(jobs) < max {
-				break
+				s.running.Add(1)
+				go s.startJob(j)
 			}
 		}
 	}
+}
+
+// startJob runs one job inside the concurrency budget, then asks the dispatcher
+// for the next one so a long queue keeps exactly ConcurrentTransfers in flight.
+func (s *TransferService) startJob(j index.TransferJob) {
+	defer func() {
+		s.running.Add(-1)
+		s.kickDispatcher()
+	}()
+	s.runJob(j)
 }
 
 // runJob executes one transfer job: conflict check, dir creation, streaming,

@@ -1,4 +1,4 @@
-import { Gauge, Keyboard, Moon, Settings2, Sun } from 'lucide-react'
+import { Gauge, Keyboard, Minus, Moon, Plus, Settings2, Sun } from 'lucide-react'
 import { useUiStore } from '@/stores/ui'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Switch } from '@/components/ui/switch'
@@ -60,7 +60,25 @@ export function SettingsDialog() {
             <Gauge size={10} /> transfers
           </div>
           <Row label="Concurrent file transfers" hint="worker pool size: the engine picks this up live">
-            <span className="font-mono text-[12px] tabular text-amber">{settings.concurrentTransfers}</span>
+            <div className="flex items-center gap-1.5">
+              <button
+                aria-label="Fewer concurrent transfers"
+                disabled={settings.concurrentTransfers <= 1}
+                onClick={() => void patch({ concurrentTransfers: Math.max(1, settings.concurrentTransfers - 1) })}
+                className="rounded p-1 text-ink-mut transition-colors hover:bg-white/10 hover:text-ink disabled:opacity-30"
+              >
+                <Minus size={12} />
+              </button>
+              <span className="w-4 text-center font-mono text-[12px] tabular text-amber">{settings.concurrentTransfers}</span>
+              <button
+                aria-label="More concurrent transfers"
+                disabled={settings.concurrentTransfers >= 8}
+                onClick={() => void patch({ concurrentTransfers: Math.min(8, settings.concurrentTransfers + 1) })}
+                className="rounded p-1 text-ink-mut transition-colors hover:bg-white/10 hover:text-ink disabled:opacity-30"
+              >
+                <Plus size={12} />
+              </button>
+            </div>
           </Row>
           <Row label="Bandwidth limit" hint="keeps the home network usable during migrations">
             <span className="font-mono text-[12px] tabular text-amber">{settings.bandwidthLimitMbps} Mbps</span>

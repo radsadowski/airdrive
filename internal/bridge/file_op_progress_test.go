@@ -3,11 +3,13 @@ package bridge
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -163,4 +165,43 @@ func TestWhenADirectoryIsDeletedThenProgressReportsTheWholeSubtree(t *testing.T)
 	r.Equal("d1", events[0]["current"])
 	r.Equal(4, events[1]["done"])
 	r.Equal(opDone, events[2]["state"])
+}
+
+func TestWhenManyItemsAreDeletedThenTheWorkersStayWithinTheLimit(t *testing.T) {
+	t.Parallel()
+	r := require.New(t)
+	ctrl := gomock.NewController(t)
+	svc, p, _ := newOpTestService(t, ctrl)
+
+	const n = 12
+	ids := make([]string, 0, n)
+	for i := 0; i < n; i++ {
+		id := fmt.Sprintf("f%02d", i)
+		ids = append(ids, id)
+		seedOpFile(t, svc, id)
+	}
+
+	var mu sync.Mutex
+	inFlight, peak := 0, 0
+	p.EXPECT().Delete(gomock.Any(), "L1", gomock.Any()).Times(n).DoAndReturn(
+		func(context.Context, string, []string) error {
+			mu.Lock()
+			inFlight++
+			if inFlight > peak {
+				peak = inFlight
+			}
+			mu.Unlock()
+			time.Sleep(20 * time.Millisecond)
+			mu.Lock()
+			inFlight--
+			mu.Unlock()
+			return nil
+		})
+
+	r.NoError(svc.DeleteFiles("L1", ids))
+
+	mu.Lock()
+	defer mu.Unlock()
+	r.LessOrEqual(peak, fileOpWorkers)
+	r.Greater(peak, 1, "items must be processed concurrently")
 }
