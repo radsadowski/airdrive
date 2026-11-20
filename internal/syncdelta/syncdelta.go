@@ -147,16 +147,22 @@ func Plan(dir Direction, actions int, a, b Side, state map[string]StateEntry, ba
 	}
 
 	sort.SliceStable(steps, func(i, j int) bool {
-		if steps[i].Kind == DeleteOnA || steps[i].Kind == DeleteOnB ||
-			steps[j].Kind == DeleteOnA || steps[j].Kind == DeleteOnB {
-			iDel := steps[i].Kind == DeleteOnA || steps[i].Kind == DeleteOnB
-			jDel := steps[j].Kind == DeleteOnA || steps[j].Kind == DeleteOnB
-			if iDel != jDel {
-				return !iDel // copies first
-			}
-			return depth(steps[i].Path) > depth(steps[j].Path) // deletes children-first
+		iDel := steps[i].Kind == DeleteOnA || steps[i].Kind == DeleteOnB
+		jDel := steps[j].Kind == DeleteOnA || steps[j].Kind == DeleteOnB
+		if iDel != jDel {
+			return !iDel // copies first
 		}
-		return depth(steps[i].Path) < depth(steps[j].Path) // copies parents-first
+		di, dj := depth(steps[i].Path), depth(steps[j].Path)
+		if di != dj {
+			if iDel {
+				return di > dj // deletes children-first
+			}
+			return di < dj // copies parents-first
+		}
+		if steps[i].Path != steps[j].Path {
+			return steps[i].Path < steps[j].Path // stable plans across runs
+		}
+		return steps[i].Kind < steps[j].Kind
 	})
 	return steps
 }
