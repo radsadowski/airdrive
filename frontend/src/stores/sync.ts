@@ -11,6 +11,10 @@ export interface ActiveSyncRun {
   filesTotal: number
   bytesDone: number
   bytesTotal: number
+  /** bytes per second between the last two progress events */
+  speed: number
+  /** timestamp of the last progress event */
+  at: number
 }
 
 /**
@@ -42,6 +46,12 @@ export const useSyncStore = create<SyncState>((set, get) => ({
         delete next[p.pairId]
         return { activeRuns: next }
       }
+      const prev = s.activeRuns[p.pairId]
+      const now = Date.now()
+      let speed = prev?.speed ?? 0
+      if (prev && now > prev.at && p.bytesDone >= prev.bytesDone) {
+        speed = (p.bytesDone - prev.bytesDone) / ((now - prev.at) / 1000)
+      }
       return {
         activeRuns: {
           ...s.activeRuns,
@@ -52,6 +62,8 @@ export const useSyncStore = create<SyncState>((set, get) => ({
             filesTotal: p.filesTotal,
             bytesDone: p.bytesDone,
             bytesTotal: p.bytesTotal,
+            speed,
+            at: now,
           },
         },
       }

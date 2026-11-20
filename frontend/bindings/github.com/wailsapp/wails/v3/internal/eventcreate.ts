@@ -9,6 +9,7 @@ import { Create as $Create } from "@wailsio/runtime";
 function configure() {
     Object.freeze(Object.assign($Create.Events, {
         "app:ready": $$createType0,
+        "fileop:progress": $$createType0,
         "fs:changed": $$createType0,
         "index:progress": $$createType0,
         "location:status": $$createType0,

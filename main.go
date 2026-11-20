@@ -31,6 +31,7 @@ func init() {
 	application.RegisterEvent[map[string]any](ev.ToastShow)
 	application.RegisterEvent[map[string]any](ev.SyncUpdated)
 	application.RegisterEvent[map[string]any](ev.SyncProgress)
+	application.RegisterEvent[map[string]any](ev.FileOpProgress)
 }
 
 func main() {

@@ -18,7 +18,8 @@ import * as entities$0 from "../entities/models.js";
 import * as application$0 from "../../../../wailsapp/wails/v3/pkg/application/models.js";
 
 /**
- * DeleteFiles moves files to trash and removes them from the index.
+ * DeleteFiles moves files to trash and removes them from the index, reporting
+ * per-item progress so a large selection shows movement in the activity bar.
  */
 export function DeleteFiles(locationID: string, fileIDs: string[]): $CancellablePromise<void> {
     return $Call.ByID(740463736, locationID, fileIDs);
@@ -52,7 +53,9 @@ export function Mkdir(locationID: string, parentID: string, name: string): $Canc
 }
 
 /**
- * MoveWithin moves files to another directory within the same location.
+ * MoveWithin moves files to another directory within the same location,
+ * reporting per-item progress so a cut and paste shows movement in the
+ * activity bar instead of completing silently.
  */
 export function MoveWithin(locationID: string, fileIDs: string[], destDirID: string): $CancellablePromise<void> {
     return $Call.ByID(1732874444, locationID, fileIDs, destDirID);

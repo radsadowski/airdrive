@@ -158,10 +158,8 @@ export function TransferDrawer() {
 
   const active = batches.filter((b) => b.active)
   const totalSpeed = active.reduce((a, b) => a + b.speed, 0)
-  const overallBytes = active.reduce((a, b) => a + b.bytesDone, 0)
-  const overallTotal = active.reduce((a, b) => a + b.bytesTotal, 0)
 
-  if (!open && active.length === 0) return null
+  if (!open) return null
 
   return (
     <div
@@ -170,41 +168,25 @@ export function TransferDrawer() {
         'shadow-[0_-12px_40px_-12px_rgba(0,0,0,0.6)]',
       )}
     >
-      {!open ? (
-        <button
-          onClick={() => setOpen(true)}
-          className="flex h-9 w-full items-center gap-3 px-4 text-left"
-        >
-          <span className="size-[6px] animate-pulse rounded-full bg-amber" />
-          <span className="text-[12.5px] text-ink">
-            {active.length} active transfer{active.length !== 1 ? 's' : ''}
-          </span>
-          <span className="font-mono text-[10.5px] tabular text-ink-faint">
-            {formatBytes(overallBytes)} / {formatBytes(overallTotal)} · {formatSpeed(totalSpeed)}
-          </span>
-          <Progress value={overallTotal > 0 ? overallBytes / overallTotal : 0} className="ml-auto max-w-[240px]" />
-        </button>
-      ) : (
-        <div className="animate-slide-up">
-          <div className="flex h-9 items-center gap-3 border-b border-hairline px-4">
-            <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">transfers</span>
-            {active.length > 0 && (
-              <span className="font-mono text-[10.5px] tabular text-amber">{formatSpeed(totalSpeed)}</span>
-            )}
-            <button
-              onClick={() => setOpen(false)}
-              className="ml-auto rounded p-1 text-ink-faint transition-colors hover:bg-white/10 hover:text-ink"
-            >
-              <X size={13} />
-            </button>
-          </div>
-          <div className="max-h-[300px] overflow-y-auto">
-            {batches.map((b) => (
-              <BatchRow key={b.id} batch={b} />
-            ))}
-          </div>
+      <div className="animate-slide-up">
+        <div className="flex h-9 items-center gap-3 border-b border-hairline px-4">
+          <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">transfers</span>
+          {active.length > 0 && (
+            <span className="font-mono text-[10.5px] tabular text-amber">{formatSpeed(totalSpeed)}</span>
+          )}
+          <button
+            onClick={() => setOpen(false)}
+            className="ml-auto rounded p-1 text-ink-faint transition-colors hover:bg-white/10 hover:text-ink"
+          >
+            <X size={13} />
+          </button>
         </div>
-      )}
+        <div className="max-h-[300px] overflow-y-auto">
+          {batches.map((b) => (
+            <BatchRow key={b.id} batch={b} />
+          ))}
+        </div>
+      </div>
     </div>
   )
 }

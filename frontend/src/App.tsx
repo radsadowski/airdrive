@@ -10,8 +10,9 @@ export default function App() {
   const theme = useUiStore((s) => s.settings.theme)
 
   useEffect(() => {
-    wireEvents()
+    const unwire = wireEvents()
     void init()
+    return unwire
   }, [init])
 
   // Apply theme to the root element so [data-theme="light"] CSS overrides kick in.

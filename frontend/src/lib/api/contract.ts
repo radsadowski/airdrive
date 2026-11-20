@@ -228,6 +228,15 @@ export interface AppEventMap {
     speed: number
   }
   'transfer:batchDone': { batchId: string; done: number; skipped: number; failed: number }
+  'fileop:progress': {
+    opId: string
+    op: 'delete' | 'move'
+    locationId: string
+    done: number
+    total: number
+    state: 'running' | 'done' | 'error'
+    error?: string
+  }
   'location:status': { locationId: string; state: LocationStatus; error?: string }
   'toast:show': ToastPayload
   'sync:updated': { pairId: string; state: 'idle' }

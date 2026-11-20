@@ -85,30 +85,33 @@ export async function pasteIntoCurrentDir(): Promise<void> {
   if (!clip || !s.currentLocationId) return
   const { sourceLocationId, fileIds, mode } = clip
 
-  if (sourceLocationId === s.currentLocationId) {
-    // same provider → cheap native move or a copy batch through the engine
-    if (mode === 'cut') {
-      await api.moveWithin(sourceLocationId, fileIds, s.dirId)
-      useUiStore.getState().setClipboard(null)
-      refresh()
+  try {
+    if (sourceLocationId === s.currentLocationId) {
+      if (mode === 'cut') {
+        await api.moveWithin(sourceLocationId, fileIds, s.dirId)
+        useUiStore.getState().setClipboard(null)
+        refresh()
+      } else {
+        await api.enqueueTransfer({
+          action: 'copy',
+          fileIds,
+          destLocationId: sourceLocationId,
+          destDirId: s.dirId,
+          conflictPolicy: 'smart',
+        })
+      }
     } else {
       await api.enqueueTransfer({
-        action: 'copy',
+        action: mode === 'cut' ? 'move' : 'copy',
         fileIds,
-        destLocationId: sourceLocationId,
+        destLocationId: s.currentLocationId,
         destDirId: s.dirId,
         conflictPolicy: 'smart',
       })
+      if (mode === 'cut') useUiStore.getState().setClipboard(null)
     }
-  } else {
-    await api.enqueueTransfer({
-      action: mode === 'cut' ? 'move' : 'copy',
-      fileIds,
-      destLocationId: s.currentLocationId,
-      destDirId: s.dirId,
-      conflictPolicy: 'smart',
-    })
-    if (mode === 'cut') useUiStore.getState().setClipboard(null)
+  } catch (e) {
+    toastError(e)
   }
 }
 

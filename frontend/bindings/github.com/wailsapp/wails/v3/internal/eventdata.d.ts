@@ -9,6 +9,7 @@ declare module "@wailsio/runtime" {
     namespace Events {
         interface CustomEvents {
             "app:ready": { [_ in string]?: any };
+            "fileop:progress": { [_ in string]?: any };
             "fs:changed": { [_ in string]?: any };
             "index:progress": { [_ in string]?: any };
             "location:status": { [_ in string]?: any };

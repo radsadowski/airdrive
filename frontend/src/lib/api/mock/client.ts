@@ -75,6 +75,17 @@ class MockClient implements ApiClient {
     this.state.loadPreset(PRESETS[3], PRESETS[3].seed)
   }
 
+  private emitOp(
+    opId: string,
+    op: 'delete' | 'move',
+    locationId: string,
+    done: number,
+    total: number,
+    state: 'running' | 'done' | 'error',
+  ): void {
+    bus.emit('fileop:progress', { opId, op, locationId, done, total, state })
+  }
+
   private async net(kind: Location['kind'], baseMs: number): Promise<void> {
     if (this.failNext) {
       this.failNext = false
@@ -310,7 +321,10 @@ class MockClient implements ApiClient {
     const kind = this.state.locations.get(locationId)?.kind ?? 'localfs'
     await this.net(kind, 220)
     const touchedOld = new Set<string | null>()
-    for (const id of fileIds) {
+    const opId = nextId('op')
+    const total = fileIds.length
+    this.emitOp(opId, 'move', locationId, 0, total, 'running')
+    for (const [index, id] of fileIds.entries()) {
       const n = this.state.node(id)
       const oldParent = n.parentId
       touchedOld.add(oldParent)
@@ -326,20 +340,29 @@ class MockClient implements ApiClient {
       const arr2 = this.state.children.get(key)
       if (arr2) arr2.push(id)
       else this.state.children.set(key, [id])
+      await sleep(90)
+      this.emitOp(opId, 'move', locationId, index + 1, total, 'running')
     }
     for (const d of touchedOld) this.touch(locationId, d)
     this.touch(locationId, destDirId)
+    this.emitOp(opId, 'move', locationId, total, total, 'done')
   }
 
   async deleteFiles(locationId: string, fileIds: string[]): Promise<void> {
     const kind = this.state.locations.get(locationId)?.kind ?? 'localfs'
     await this.net(kind, 180)
     const touchedDirs = new Set<string | null>()
-    for (const id of fileIds) {
+    const opId = nextId('op')
+    const total = fileIds.length
+    this.emitOp(opId, 'delete', locationId, 0, total, 'running')
+    for (const [index, id] of fileIds.entries()) {
       const n = this.state.node(id)
       touchedDirs.add(n.parentId)
       n.trashed = true
+      await sleep(90)
+      this.emitOp(opId, 'delete', locationId, index + 1, total, 'running')
     }
+    this.emitOp(opId, 'delete', locationId, total, total, 'done')
     for (const d of touchedDirs) this.touch(locationId, d)
     this.refreshCounts(locationId)
     const names = fileIds.length === 1 ? `“${this.state.node(fileIds[0]).name}”` : `${fileIds.length} items`

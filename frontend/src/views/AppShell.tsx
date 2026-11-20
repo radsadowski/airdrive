@@ -14,8 +14,8 @@ import { SearchOverlay } from '@/components/search'
 import { Wizards } from '@/components/wizards'
 import { TransferPicker } from '@/components/transfer-picker'
 import { SettingsDialog } from '@/components/settings'
-import { SyncActivityBar } from '@/components/sync-bar'
 import { SyncPanel } from '@/components/sync'
+import { ActivityBar } from '@/components/activity-bar'
 import { PromptDialog } from '@/components/prompt'
 import { ReconnectPrompt } from '@/components/reconnect-prompt'
 import { Toasts } from '@/components/toasts'
@@ -179,7 +179,7 @@ export function AppShell() {
         </main>
       </div>
 
-      <SyncActivityBar />
+      <ActivityBar />
 
       <SearchOverlay />
       <Wizards />

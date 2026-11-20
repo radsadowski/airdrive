@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/google/uuid"
 	"github.com/wailsapp/wails/v3/pkg/application"
 
 	"github.com/radosny/airdrive/internal/entities"
@@ -24,20 +25,35 @@ const (
 	sortFieldKind       = "kind"
 )
 
+// File operation kinds and states reported through fileop:progress.
+const (
+	opDelete  = "delete"
+	opMove    = "move"
+	opRunning = "running"
+	opDone    = "done"
+	opError   = "error"
+)
+
 // FileService exposes file operations to the frontend.
 type FileService struct {
 	app      *application.App
 	db       *index.DB
 	registry *provider.Registry
 	logger   *slog.Logger
+	// emit is the event seam; the no-op default lets tests record progress
+	// without a Wails app.
+	emit func(name string, data ...any)
 }
 
 func NewFileService(app *application.App, db *index.DB, registry *provider.Registry, logger *slog.Logger) *FileService {
-	return &FileService{app: app, db: db, registry: registry, logger: logger}
+	return &FileService{app: app, db: db, registry: registry, logger: logger, emit: func(string, ...any) {}}
 }
 
 // SetApp injects the Wails app reference after application.New returns.
-func (s *FileService) SetApp(app *application.App) { s.app = app }
+func (s *FileService) SetApp(app *application.App) {
+	s.app = app
+	s.emit = func(name string, data ...any) { app.Event.Emit(name, data...) }
+}
 
 func (s *FileService) provider(locationID string) (provider.StorageProvider, error) {
 	return s.registry.Get(locationID)
@@ -114,7 +130,9 @@ func (s *FileService) Rename(locationID, fileID, newName string) (*entities.File
 	return &result, nil
 }
 
-// MoveWithin moves files to another directory within the same location.
+// MoveWithin moves files to another directory within the same location,
+// reporting per-item progress so a cut and paste shows movement in the
+// activity bar instead of completing silently.
 func (s *FileService) MoveWithin(locationID string, fileIDs []string, destDirID string) error {
 	p, err := s.provider(locationID)
 	if err != nil {
@@ -126,10 +144,14 @@ func (s *FileService) MoveWithin(locationID string, fileIDs []string, destDirID 
 			oldParents[id] = f.ParentID
 		}
 	}
-	if err := p.MoveWithin(context.Background(), locationID, fileIDs, destDirID); err != nil {
-		return fmt.Errorf("move: %w", err)
-	}
-	for _, id := range fileIDs {
+	opID := uuid.NewString()
+	total := len(fileIDs)
+	s.emitOp(opID, opMove, locationID, 0, total, opRunning, "")
+	for i, id := range fileIDs {
+		if err := p.MoveWithin(context.Background(), locationID, []string{id}, destDirID); err != nil {
+			s.emitOp(opID, opMove, locationID, i, total, opError, err.Error())
+			return fmt.Errorf("move: %w", err)
+		}
 		newPath := filepath.Join(destDirID, filepath.Base(id))
 		_ = s.db.DeleteFile(context.Background(), locationID, id)
 		if f, err := p.Stat(context.Background(), locationID, newPath); err == nil {
@@ -138,12 +160,15 @@ func (s *FileService) MoveWithin(locationID string, fileIDs []string, destDirID 
 		if old, ok := oldParents[id]; ok {
 			s.emitFsChanged(locationID, old)
 		}
+		s.emitOp(opID, opMove, locationID, i+1, total, opRunning, "")
 	}
+	s.emitOp(opID, opMove, locationID, total, total, opDone, "")
 	s.emitFsChanged(locationID, destDirID)
 	return nil
 }
 
-// DeleteFiles moves files to trash and removes them from the index.
+// DeleteFiles moves files to trash and removes them from the index, reporting
+// per-item progress so a large selection shows movement in the activity bar.
 func (s *FileService) DeleteFiles(locationID string, fileIDs []string) error {
 	p, err := s.provider(locationID)
 	if err != nil {
@@ -155,14 +180,20 @@ func (s *FileService) DeleteFiles(locationID string, fileIDs []string) error {
 			parents[f.ParentID] = true
 		}
 	}
-	if err := p.Delete(context.Background(), locationID, fileIDs); err != nil {
-		return fmt.Errorf("delete: %w", err)
-	}
-	for _, id := range fileIDs {
+	opID := uuid.NewString()
+	total := len(fileIDs)
+	s.emitOp(opID, opDelete, locationID, 0, total, opRunning, "")
+	for i, id := range fileIDs {
+		if err := p.Delete(context.Background(), locationID, []string{id}); err != nil {
+			s.emitOp(opID, opDelete, locationID, i, total, opError, err.Error())
+			return fmt.Errorf("delete: %w", err)
+		}
 		if dErr := s.db.DeleteTree(context.Background(), locationID, id); dErr != nil {
 			s.logger.Warn("delete file from index", "location", locationID, "id", id, "err", dErr)
 		}
+		s.emitOp(opID, opDelete, locationID, i+1, total, opRunning, "")
 	}
+	s.emitOp(opID, opDelete, locationID, total, total, opDone, "")
 	for parent := range parents {
 		s.emitFsChanged(locationID, parent)
 	}
@@ -223,12 +254,22 @@ func (s *FileService) Search(text string, locationIDs []string, sizeMin, sizeMax
 // ---- helpers ------------------------------------------------------------- //
 
 func (s *FileService) emitFsChanged(locationID, dirID string) {
-	if s.app == nil {
-		return
-	}
-	s.app.Event.Emit(ev.FsChanged, map[string]any{
+	s.emit(ev.FsChanged, map[string]any{
 		"locationId": locationID,
 		"dirId":      nilIfEmpty(dirID),
+	})
+}
+
+// emitOp reports progress for a file operation shown in the activity bar.
+func (s *FileService) emitOp(opID, op, locationID string, done, total int, state, errMsg string) {
+	s.emit(ev.FileOpProgress, map[string]any{
+		"opId":       opID,
+		"op":         op,
+		"locationId": locationID,
+		"done":       done,
+		"total":      total,
+		"state":      state,
+		"error":      errMsg,
 	})
 }
 

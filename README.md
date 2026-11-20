@@ -89,7 +89,9 @@ xattr -d com.apple.quarantine /Applications/AirDrive.app
 - **✅ Arrives intact**: every copy is double-checked on arrival, so a
   broken transfer never silently replaces a good file
 - **📊 Live progress**: watch per-file speed, pause and resume big
-  copies, cancel, or retry just the files that failed
+  copies, cancel, or retry just the files that failed. One status strip
+  covers everything in flight: indexing, syncing, transfers, and moving
+  items to the trash or between folders
 - **⬆️ Uploads**: drop files from Finder onto any cloud location, or
   use the Upload button
 

@@ -16,4 +16,5 @@ const (
 	ToastShow         = "toast:show"
 	SyncUpdated       = "sync:updated"
 	SyncProgress      = "sync:progress"
+	FileOpProgress    = "fileop:progress"
 )
