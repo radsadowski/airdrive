@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -29,11 +30,12 @@ const (
 
 // File operation kinds and states reported through fileop:progress.
 const (
-	opDelete  = "delete"
-	opMove    = "move"
-	opRunning = "running"
-	opDone    = "done"
-	opError   = "error"
+	opDelete      = "delete"
+	opMove        = "move"
+	opRunning     = "running"
+	opDone        = "done"
+	opError       = "error"
+	opInterrupted = "interrupted"
 )
 
 // fileOpWorkers bounds how many selected items a delete or in-place move
@@ -160,7 +162,8 @@ func (s *FileService) Rename(locationID, fileID, newName string) (*entities.File
 // MoveWithin moves files to another directory within the same location,
 // reporting the indexed scope of each selected item. Items move by
 // fileOpWorkers at a time; a folder is renamed as one provider primitive, so
-// its step lands when the whole subtree moved.
+// its step lands when the whole subtree moved. Every item is recorded in the
+// file_ops ledger first, so the same item cannot be moved or deleted twice.
 func (s *FileService) MoveWithin(locationID string, fileIDs []string, destDirID string) error {
 	p, err := s.provider(locationID)
 	if err != nil {
@@ -183,6 +186,28 @@ func (s *FileService) MoveWithin(locationID string, fileIDs []string, destDirID 
 	}
 
 	opID := uuid.NewString()
+	opIDs := make([]string, len(targets))
+	ledger := make([]index.FileOp, 0, len(targets))
+	for i, t := range targets {
+		opIDs[i] = uuid.NewString()
+		ledger = append(ledger, index.FileOp{
+			ID: opIDs[i], LocationID: locationID, ItemID: t.id, ItemPath: t.path, Kind: opMove,
+		})
+	}
+	if lErr := s.db.BeginFileOps(ctx, ledger); lErr != nil {
+		if errors.Is(lErr, index.ErrOpInFlight) {
+			return fmt.Errorf("move: an item in this selection is already being deleted or moved")
+		}
+		return fmt.Errorf("move: %w", lErr)
+	}
+	finished := make([]bool, len(targets))
+	finish := func(i int, state, msg string) {
+		finished[i] = true
+		if fErr := s.db.FinishFileOp(ctx, opIDs[i], state, msg); fErr != nil {
+			s.logger.Warn("file ops: finish", "id", opIDs[i], "err", fErr)
+		}
+	}
+
 	var done atomic.Int64
 	var failed atomic.Bool
 	var mu sync.Mutex
@@ -191,16 +216,18 @@ func (s *FileService) MoveWithin(locationID string, fileIDs []string, destDirID 
 
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, fileOpWorkers)
-	for _, t := range targets {
+	for i := range targets {
 		if failed.Load() {
 			break
 		}
+		t := targets[i]
 		sem <- struct{}{}
 		wg.Add(1)
-		go func(t opTarget) {
+		go func(i int, t opTarget) {
 			defer wg.Done()
 			defer func() { <-sem }()
 			if err := p.MoveWithin(ctx, locationID, []string{t.id}, destDirID); err != nil {
+				finish(i, opError, err.Error())
 				mu.Lock()
 				if firstErr == nil {
 					firstErr = err
@@ -218,11 +245,12 @@ func (s *FileService) MoveWithin(locationID string, fileIDs []string, destDirID 
 			if old, ok := oldParents[t.id]; ok {
 				s.emitFsChanged(locationID, old)
 			}
+			finish(i, opDone, "")
 			n := int(done.Add(int64(t.count)))
 			if !failed.Load() {
 				s.emitOp(opID, opMove, locationID, n, total, opRunning, t.path, "")
 			}
-		}(t)
+		}(i, t)
 	}
 	wg.Wait()
 
@@ -230,6 +258,11 @@ func (s *FileService) MoveWithin(locationID string, fileIDs []string, destDirID 
 	err = firstErr
 	mu.Unlock()
 	if err != nil {
+		for i := range targets {
+			if !finished[i] {
+				finish(i, opInterrupted, err.Error())
+			}
+		}
 		return fmt.Errorf("move: %w", err)
 	}
 	s.emitOp(opID, opMove, locationID, total, total, opDone, "", "")
@@ -269,7 +302,9 @@ func (s *FileService) opTargets(ctx context.Context, locationID string, fileIDs 
 // DeleteFiles moves files to trash and removes them from the index, reporting
 // the indexed scope of each selected item so a folder delete shows how many
 // entries it covers and which one is in flight. Selected items are removed by
-// fileOpWorkers at a time; a folder is still one provider primitive.
+// fileOpWorkers at a time; a folder is still one provider primitive. Every
+// item is recorded in the file_ops ledger first, so the same item cannot be
+// scheduled twice while it is being removed.
 func (s *FileService) DeleteFiles(locationID string, fileIDs []string) error {
 	p, err := s.provider(locationID)
 	if err != nil {
@@ -292,6 +327,28 @@ func (s *FileService) DeleteFiles(locationID string, fileIDs []string) error {
 	}
 
 	opID := uuid.NewString()
+	opIDs := make([]string, len(targets))
+	ledger := make([]index.FileOp, 0, len(targets))
+	for i, t := range targets {
+		opIDs[i] = uuid.NewString()
+		ledger = append(ledger, index.FileOp{
+			ID: opIDs[i], LocationID: locationID, ItemID: t.id, ItemPath: t.path, Kind: opDelete,
+		})
+	}
+	if lErr := s.db.BeginFileOps(ctx, ledger); lErr != nil {
+		if errors.Is(lErr, index.ErrOpInFlight) {
+			return fmt.Errorf("delete: an item in this selection is already being deleted or moved")
+		}
+		return fmt.Errorf("delete: %w", lErr)
+	}
+	finished := make([]bool, len(targets))
+	finish := func(i int, state, msg string) {
+		finished[i] = true
+		if fErr := s.db.FinishFileOp(ctx, opIDs[i], state, msg); fErr != nil {
+			s.logger.Warn("file ops: finish", "id", opIDs[i], "err", fErr)
+		}
+	}
+
 	var done atomic.Int64
 	var failed atomic.Bool
 	var mu sync.Mutex
@@ -300,16 +357,18 @@ func (s *FileService) DeleteFiles(locationID string, fileIDs []string) error {
 
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, fileOpWorkers)
-	for _, t := range targets {
+	for i := range targets {
 		if failed.Load() {
 			break
 		}
+		t := targets[i]
 		sem <- struct{}{}
 		wg.Add(1)
-		go func(t opTarget) {
+		go func(i int, t opTarget) {
 			defer wg.Done()
 			defer func() { <-sem }()
 			if err := p.Delete(ctx, locationID, []string{t.id}); err != nil {
+				finish(i, opError, err.Error())
 				mu.Lock()
 				if firstErr == nil {
 					firstErr = err
@@ -322,11 +381,12 @@ func (s *FileService) DeleteFiles(locationID string, fileIDs []string) error {
 			if dErr := s.db.DeleteTree(ctx, locationID, t.id); dErr != nil {
 				s.logger.Warn("delete file from index", "location", locationID, "id", t.id, "err", dErr)
 			}
+			finish(i, opDone, "")
 			n := int(done.Add(int64(t.count)))
 			if !failed.Load() {
 				s.emitOp(opID, opDelete, locationID, n, total, opRunning, t.path, "")
 			}
-		}(t)
+		}(i, t)
 	}
 	wg.Wait()
 
@@ -334,6 +394,11 @@ func (s *FileService) DeleteFiles(locationID string, fileIDs []string) error {
 	err = firstErr
 	mu.Unlock()
 	if err != nil {
+		for i := range targets {
+			if !finished[i] {
+				finish(i, opInterrupted, err.Error())
+			}
+		}
 		return fmt.Errorf("delete: %w", err)
 	}
 	s.emitOp(opID, opDelete, locationID, total, total, opDone, "", "")

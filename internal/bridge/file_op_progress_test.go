@@ -205,3 +205,30 @@ func TestWhenManyItemsAreDeletedThenTheWorkersStayWithinTheLimit(t *testing.T) {
 	r.LessOrEqual(peak, fileOpWorkers)
 	r.Greater(peak, 1, "items must be processed concurrently")
 }
+
+func TestWhenADeleteIsAlreadyRunningThenASecondDeleteIsRejected(t *testing.T) {
+	t.Parallel()
+	r := require.New(t)
+	ctrl := gomock.NewController(t)
+	svc, p, _ := newOpTestService(t, ctrl)
+	seedOpFile(t, svc, "a")
+
+	started := make(chan struct{})
+	release := make(chan struct{})
+	done := make(chan error, 1)
+	p.EXPECT().Delete(gomock.Any(), "L1", []string{"a"}).Times(1).DoAndReturn(
+		func(context.Context, string, []string) error {
+			close(started)
+			<-release
+			return nil
+		})
+
+	go func() { done <- svc.DeleteFiles("L1", []string{"a"}) }()
+	<-started
+
+	err := svc.DeleteFiles("L1", []string{"a"})
+	r.ErrorContains(err, "already being deleted or moved")
+
+	close(release)
+	r.NoError(<-done)
+}

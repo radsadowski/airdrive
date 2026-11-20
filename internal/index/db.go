@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -356,6 +357,82 @@ func (d *DB) CountSubtree(ctx context.Context, locationID, fileID string) (int, 
 		SELECT COUNT(*) FROM subtree`,
 		locationID, fileID, locationID).Scan(&n)
 	return n, err
+}
+
+// FileOp is one scheduled file operation in the ledger.
+type FileOp struct {
+	ID         string
+	LocationID string
+	ItemID     string
+	ItemPath   string
+	Kind       string
+}
+
+// ErrOpInFlight reports that an operation for the same item is already running.
+var ErrOpInFlight = errors.New("operation already in progress")
+
+// BeginFileOps records the operations as running. If any selected item already
+// has a running operation the whole batch is rejected, so a double schedule
+// cannot slip through between the check and the first provider call.
+func (d *DB) BeginFileOps(ctx context.Context, ops []FileOp) error {
+	tx, err := d.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin file ops: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	for _, op := range ops {
+		res, insErr := tx.ExecContext(ctx,
+			`INSERT OR IGNORE INTO file_ops(id,location_id,item_id,item_path,kind,state) VALUES(?,?,?,?,?,'running')`,
+			op.ID, op.LocationID, op.ItemID, op.ItemPath, op.Kind)
+		if insErr != nil {
+			return fmt.Errorf("begin file ops: %w", insErr)
+		}
+		n, rowsErr := res.RowsAffected()
+		if rowsErr != nil {
+			return fmt.Errorf("begin file ops: %w", rowsErr)
+		}
+		if n == 0 {
+			return ErrOpInFlight
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("begin file ops: %w", err)
+	}
+	return nil
+}
+
+// FinishFileOp records the terminal state of one operation.
+func (d *DB) FinishFileOp(ctx context.Context, opID, state, errMsg string) error {
+	_, err := d.db.ExecContext(ctx,
+		`UPDATE file_ops SET state=?, error=?, updated_at=strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE id=?`,
+		state, errMsg, opID)
+	if err != nil {
+		return fmt.Errorf("finish file op: %w", err)
+	}
+	return nil
+}
+
+// InterruptFileOps marks operations left running by a previous process, so a
+// restart never leaves an item blocked forever.
+func (d *DB) InterruptFileOps(ctx context.Context, reason string) (int64, error) {
+	res, err := d.db.ExecContext(ctx,
+		`UPDATE file_ops SET state='interrupted', error=?, updated_at=strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE state='running'`,
+		reason)
+	if err != nil {
+		return 0, fmt.Errorf("interrupt file ops: %w", err)
+	}
+	return res.RowsAffected()
+}
+
+// PruneFileOps deletes finished ledger rows older than the cutoff.
+func (d *DB) PruneFileOps(ctx context.Context, before time.Time) (int64, error) {
+	res, err := d.db.ExecContext(ctx,
+		`DELETE FROM file_ops WHERE state != 'running' AND updated_at < ?`,
+		before.UTC().Format(time.RFC3339))
+	if err != nil {
+		return 0, fmt.Errorf("prune file ops: %w", err)
+	}
+	return res.RowsAffected()
 }
 
 // DisplayPath returns the root-relative path of a file, built from indexed

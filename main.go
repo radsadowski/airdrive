@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"log"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
@@ -158,6 +160,16 @@ func main() {
 			logger.Error("restore locations", "err", err)
 		}
 		transfers.Interrupt("interrupted by app restart")
+		if n, iErr := db.InterruptFileOps(context.Background(), "interrupted by app restart"); iErr != nil {
+			logger.Warn("file ops: interrupt", "err", iErr)
+		} else if n > 0 {
+			logger.Info("file ops: interrupted", "count", n)
+		}
+		if n, pErr := db.PruneFileOps(context.Background(), time.Now().Add(-24*time.Hour)); pErr != nil {
+			logger.Warn("file ops: prune", "err", pErr)
+		} else if n > 0 {
+			logger.Info("file ops: pruned", "count", n)
+		}
 	}()
 
 	app.Event.Emit(ev.AppReady, map[string]any{

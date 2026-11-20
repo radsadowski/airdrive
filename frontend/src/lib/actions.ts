@@ -45,17 +45,24 @@ export function renameSelection(file: FileInfo): void {
   })
 }
 
+let trashInFlight: Promise<void> | null = null
+
 export function trashSelection(): Promise<void> {
+  if (trashInFlight) return trashInFlight
   const s = useAppStore.getState()
   if (!s.currentLocationId || s.selection.length === 0) return Promise.resolve()
   const ids = [...s.selection]
-  return api
+  trashInFlight = api
     .deleteFiles(s.currentLocationId, ids)
     .then(() => {
       useAppStore.getState().clearSelection()
       refresh()
     })
     .catch(toastError)
+    .finally(() => {
+      trashInFlight = null
+    })
+  return trashInFlight
 }
 
 export function downloadSelection(explicitIds?: string[]): void {
